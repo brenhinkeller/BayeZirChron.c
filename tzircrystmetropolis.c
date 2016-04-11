@@ -50,22 +50,22 @@ void generateSyntheticZirconDataset(pcg32_random_t* rng, const double* dist, con
 }
 
 double compareZirconPopulations(const double* data, const double* uncert, const double* synzirc, const uint32_t rows){
-	double likelihood = 0;
+	double loglikelihood = 0;
 	for (int i=0; i<rows; i++){
-		likelihood += log10( 1 / (uncert[i] * sqrt(2*M_PI)) * exp( - (synzirc[i]-data[i])*(synzirc[i]-data[i]) / (2*uncert[i]*uncert[i]) ));
+		loglikelihood += log10( 1 / (uncert[i] * sqrt(2*M_PI)) * exp( - (synzirc[i]-data[i])*(synzirc[i]-data[i]) / (2*uncert[i]*uncert[i]) ));
 	}
-	return likelihood / (double)rows;
+	return loglikelihood / (double)rows;
 }
 
 
 double testAgeModel(pcg32_random_t* rng, const double* dist, const uint32_t distrows, const double* data, const double* uncert, double* synzirc, const uint32_t datarows, const uint32_t nsims, const double tmin, const double tmax){
-	double likelihood = 0;
+	double loglikelihood = 0;
 	for (int i=0; i<nsims; i++){
 		generateSyntheticZirconDataset(rng, dist, distrows, tmin, tmax, uncert, synzirc, datarows);
 		sort_doubles(synzirc, datarows);
-		likelihood += compareZirconPopulations(data, uncert, synzirc, datarows);
+		loglikelihood += compareZirconPopulations(data, uncert, synzirc, datarows);
 	}
-	return likelihood / (double)nsims;
+	return loglikelihood / (double)nsims;
 }
 
 
@@ -124,7 +124,7 @@ int main(int argc, char **argv){
 			tmax_proposed = tmax + pcg_gaussian_ziggurat(&rng, tmax_step);
 		}
 
-		// Calculate likelihood for new proposal
+		// Calculate log likelihood for new proposal
 		theta_proposed = testAgeModel(&rng, dist, distrows, data, &data[datarows*1], synzirc, datarows, nsims, tmin_proposed, tmax_proposed);
 
 		printf("%f\t%f\t", theta_proposed, theta);

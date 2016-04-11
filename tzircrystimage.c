@@ -1,6 +1,7 @@
 /******************************************************************************
- * FILE: tzircryst.c
- * DESCRIPTION:  
+ * FILE: tzircrystimage.c
+ * DESCRIPTION: Creates a 2-d matrix for the likelihood of zircon crystallization
+ * models as a function of initial and final zircon crystallization time
  * AUTHOR: C. Brenhin Keller
  ******************************************************************************/
 
@@ -51,22 +52,22 @@ void generateSyntheticZirconDataset(pcg32_random_t* rng, const double* dist, con
 }
 
 double compareZirconPopulations(const double* data, const double* uncert, const double* synzirc, const uint32_t rows){
-	double likelihood = 0;
+	double loglikelihood = 0;
 	for (int i=0; i<rows; i++){
-		likelihood += 1/(uncert[i] * sqrt(2*M_PI)) * exp( - (synzirc[i]-data[i])*(synzirc[i]-data[i]) / (2*uncert[i]*uncert[i]) );
+		loglikelihood += log10( 1/(uncert[i] * sqrt(2*M_PI)) * exp( - (synzirc[i]-data[i])*(synzirc[i]-data[i]) / (2*uncert[i]*uncert[i]) ));
 	}
-	return likelihood / (double)rows;
+	return loglikelihood / (double)rows;
 }
 
 
 double testAgeModel(pcg32_random_t* rng, const double* dist, const uint32_t distrows, const double* data, const double* uncert, double* synzirc, const uint32_t datarows, const uint32_t nsims, const double tmin, const double tmax){
-	double likelihood = 0;
+	double loglikelihood = 0;
 	for (int i=0; i<nsims; i++){
 		generateSyntheticZirconDataset(rng, dist, distrows, tmin, tmax, uncert, synzirc, datarows);
 		sort_doubles(synzirc, datarows);
-		likelihood += compareZirconPopulations(data, uncert, synzirc, datarows);
+		loglikelihood += compareZirconPopulations(data, uncert, synzirc, datarows);
 	}
-	return likelihood / (double)nsims;
+	return loglikelihood / (double)nsims;
 }
 
 
@@ -100,16 +101,6 @@ int main(int argc, char **argv){
 	pcg32_srandom_r(&rng,time(NULL), clock());
 
 
-//	generateSyntheticZirconDataset(&rng, dist, distrows, 27.0, 27.3, &data[datarows*1], synzirc, datarows);
-//
-//	sort_doubles(synzirc, datarows);
-//
-//	for (i=0; i<datarows; i++){
-//		printf("%g\n",synzirc[i]);
-//	}
-//
-//	printf("likelihood: %g\n", compareZirconPopulations(data, &data[datarows*1], synzirc, datarows));
-
 	double tl, tu;
 
 
@@ -119,7 +110,7 @@ int main(int argc, char **argv){
 	}
 	printf("\n");
 
-
+	// Print matrix image, with x and y scales
 	for (tl = tmin-dt; tl < tmin+dt;  tl += dt/50.0){
 		printf("%g\t", tl);
 
