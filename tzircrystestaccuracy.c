@@ -177,14 +177,20 @@ int main(int argc, char **argv){
 	uint32_t Ns[] = {1,2,3,4,5,6,7,8,9,10,20,30,40,50,60,70,80,90,100,200,300,400,500,600,700,800,900,1000};
 	uint32_t nNs = 27;
 
+	double tmin_true = 30;
+	double relagerange = 1/100.0;
+	double reluncert = 0.1/100.0;
+	double tmax_true = tmin_true*(1+relagerange);
+
+
 	for (i=0; i<nNs; i++){
 		N = Ns[i];
 
 		for (j=0; j<N; j++){
-			uncert[j] = 30 * 0.1/100;
+			uncert[j] = tmin_true * reluncert;
 		}
 
-		generateSyntheticZirconDataset(&rng, dist, distrows, 30.0, 30.3, uncert, data, N);
+		generateSyntheticZirconDataset(&rng, dist, distrows, tmin_true, tmax_true, uncert, data, N);
 
 		wmean(data, uncert, N, &wx, &wsigma, &mswd);
 
@@ -192,7 +198,7 @@ int main(int argc, char **argv){
 
 		tmin_metropolis_est = findMetropolisEstimate(&rng, dist, distrows, data, uncert, synzirc, N, nsims, nsteps);
 
-		printf("%i\t%g\t%g\t%g\t%g\t%g\t%g\n", N, 30.0, wx, wsigma, mswd, tmin_obs, tmin_metropolis_est);
+		printf("%i\t%g\t%g\t%g\t%g\n", N, tmin_true, wx, tmin_obs, tmin_metropolis_est);
 	}
 	
 MPI_Finalize();
