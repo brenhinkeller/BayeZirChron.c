@@ -1,6 +1,8 @@
 /******************************************************************************
- * FILE: tzircrystmetroplis.c
- * DESCRIPTION: Runs metropolis walker to find optima of zircon age distribution
+ * FILE: tzircrystestaccuracy.c
+ * DESCRIPTION: Creates multiple synthetic zircon datasets of varying N, and 
+ * compares accuracy of weighted mean, youngest-zircon, and Bayesian 
+ * metropolis walker estimates for time of final zircon crystallization.
  * AUTHOR: C. Brenhin Keller
  ******************************************************************************/
 
@@ -8,6 +10,8 @@
 #include <stdio.h>
 #include <math.h>
 #include <time.h>
+#include <mpi.h>
+
 #include "arrays.h"
 
 #include "pcg_variants.h"
@@ -69,60 +73,35 @@ double testAgeModel(pcg32_random_t* rng, const double* dist, const uint32_t dist
 }
 
 
-int main(int argc, char **argv){
-	uint32_t distrows, distcolumns;
-	uint32_t datarows, datacolumns;
-	uint32_t i, j, k;
-
-	//Check input arguments
-	if (argc != 5) {
-		fprintf(stderr,"USAGE: %s <nsims> <nsteps> <distribution.tsv> <zircondata.tsv>\n", argv[0]);
-		exit(1);
-	}
-
-	// Get number of simulations per MPI task from command-line argument
-	const uint32_t nsims = (uint32_t)abs(atoi(argv[1]));
-	// Get number of steps for metropolis walker to take	
-	const uint32_t nsteps = (uint32_t)abs(atoi(argv[2]));
-
-	// Import data	
-	const double* dist = csvparseflat(argv[3],'\t', &distrows, &distcolumns);	
-	const double* data = csvparseflat(argv[4],'\t', &datarows, &datacolumns);
+double findMetropolisEstimate(pcg32_random_t* rng, const double* dist, const uint32_t distrows, const double* data, const double* uncert, double* synzirc, const uint32_t datarows, const uint32_t nsims, const uint32_t nsteps){
 	const double tmin_obs = minArray(data, datarows);
 	const double tmax_obs = maxArray(data, datarows);
 	const double dt = tmax_obs - tmin_obs;
-	double* synzirc = malloc(datarows * sizeof(double));
-	for (i=0; i<datarows; i++) {synzirc[i]=0;}
-
-//	printf("distribution size: %i, %i\n", distrows, distcolumns);
-//	printf("data size: %i, %i\n", datarows, datacolumns);
-
-	pcg32_random_t rng;
-	pcg32_srandom_r(&rng,time(NULL), clock());
-
 
 	double tmin, tmax, theta, tmin_proposed, tmax_proposed, theta_proposed;
 	double r, tmin_step=dt/10, tmax_step=dt/10;
+	uint32_t i;
 
+	double tmins[nsteps];
+	
 	tmin = tmin_obs;
 	tmax = tmax_obs;
 	tmin_proposed = tmin_obs;
 	tmax_proposed = tmax_obs;
-	theta = testAgeModel(&rng, dist, distrows, data, &data[datarows*1], synzirc, datarows, nsims, tmin_proposed, tmax_proposed);
+	theta = testAgeModel(rng, dist, distrows, data, uncert, synzirc, datarows, nsims, tmin_proposed, tmax_proposed);
 
-	double p = 10;
 
 	for (i=0; i<nsteps; i++){
-		
+
 		// Uniformly adjust either the upper or lower bound age
-		r = pcg32_random_r(&rng)/(double)UINT32_MAX;
+		r = pcg32_random_r(rng)/(double)UINT32_MAX;
 		if (r<0.5){
-			tmin_proposed = tmin + pcg_gaussian_ziggurat(&rng, tmin_step);
+			tmin_proposed = tmin + pcg_gaussian_ziggurat(rng, tmin_step);
 			if (tmin_proposed > tmax)
-			tmax_proposed = tmax;
+				tmax_proposed = tmax;
 		} else {
 			tmin_proposed = tmin;
-			tmax_proposed = tmax + pcg_gaussian_ziggurat(&rng, tmax_step);
+			tmax_proposed = tmax + pcg_gaussian_ziggurat(rng, tmax_step);
 		}
 
 		if (tmin_proposed>tmax_proposed){
@@ -132,19 +111,90 @@ int main(int argc, char **argv){
 		}
 
 		// Calculate log likelihood for new proposal
-		theta_proposed = testAgeModel(&rng, dist, distrows, data, &data[datarows*1], synzirc, datarows, nsims, tmin_proposed, tmax_proposed);
-
+		theta_proposed = testAgeModel(rng, dist, distrows, data, uncert, synzirc, datarows, nsims, tmin_proposed, tmax_proposed);
 
 		// Decide to accept or reject the proposal
-		r = pcg32_random_r(&rng)/(double)UINT32_MAX;
-		if (r < pow(10,theta_proposed-theta)){// && tmin_proposed < tmax_proposed){ // don't let tmax go below tmin
+		r = pcg32_random_r(rng)/(double)UINT32_MAX;
+		if (r < pow(10,theta_proposed-theta)){	
 			tmin = tmin_proposed;
 			tmax = tmax_proposed;
 			theta = theta_proposed;
 		}
 
-		printf("%f\t%f\n", tmin, tmax);
+		tmins[i] = tmin;
 	}
 
+return nanmean(tmins, nsteps);
+}
+
+
+int main(int argc, char **argv){
+	uint32_t distrows, distcolumns;
+	uint32_t N, i, j, k;
+	int world_size, world_rank, rc;
+
+	//Check input arguments
+	if (argc != 4) {
+		fprintf(stderr,"USAGE: %s <nsims> <nsteps> <distribution.tsv>\n", argv[0]);
+		exit(1);
+	}
+
+	// Start MPI
+	rc = MPI_Init(&argc,&argv); 
+	if (rc != MPI_SUCCESS) {
+		printf ("Error starting MPI program. Terminating.\n"); MPI_Abort(MPI_COMM_WORLD, rc);
+	}
+
+	// Get world size (number of MPI processes) and world rank (# of this process)
+	MPI_Comm_size(MPI_COMM_WORLD,&world_size);
+	MPI_Comm_rank(MPI_COMM_WORLD,&world_rank);
+
+
+	// Get number of simulations per MPI task from command-line argument
+	const uint32_t nsims = (uint32_t)abs(atoi(argv[1]));
+	// Get number of steps for metropolis walker to take	
+	const uint32_t nsteps = (uint32_t)abs(atoi(argv[2]));
+
+	// Import data	
+	const double* dist = csvparseflat(argv[3],'\t', &distrows, &distcolumns);	
+
+//	printf("distribution size: %i, %i\n", distrows, distcolumns);
+//	printf("data size: %i, %i\n", datarows, datacolumns);
+
+	const uint32_t Nmin = 1;
+	const uint32_t Nmax = 1000;
+
+
+	double* synzirc = malloc(Nmax * sizeof(double));
+	double* data = malloc(Nmax * sizeof(double));
+	double* uncert = malloc(Nmax * sizeof(double));
+	double tmin_metropolis_est, tmin_obs, wx, wsigma, mswd;
+
+
+	pcg32_random_t rng;
+	pcg32_srandom_r(&rng,time(NULL), clock());
+
+	uint32_t Ns[] = {1,2,3,4,5,6,7,8,9,10,20,30,40,50,60,70,80,90,100,200,300,400,500,600,700,800,900,1000};
+	uint32_t nNs = 27;
+
+	for (i=0; i<nNs; i++){
+		N = Ns[i];
+
+		for (j=0; j<N; j++){
+			uncert[j] = 30 * 0.1/100;
+		}
+
+		generateSyntheticZirconDataset(&rng, dist, distrows, 30.0, 30.3, uncert, data, N);
+
+		wmean(data, uncert, N, &wx, &wsigma, &mswd);
+
+		tmin_obs = minArray(data, N);
+
+		tmin_metropolis_est = findMetropolisEstimate(&rng, dist, distrows, data, uncert, synzirc, N, nsims, nsteps);
+
+		printf("%i\t%g\t%g\t%g\t%g\t%g\t%g\n", N, 30.0, wx, wsigma, mswd, tmin_obs, tmin_metropolis_est);
+	}
+	
+MPI_Finalize();
 return 0;
 }

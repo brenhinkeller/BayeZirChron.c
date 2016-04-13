@@ -5,7 +5,7 @@ if ~exist('dist','var'); load zircondistribution; end;
 
 %% draw from new PDF
 
-nzircs=100;
+nzircs=1000;
 agemax = 27.3;
 agemin = 27.0;
 
@@ -30,7 +30,7 @@ plot([0,nzircs+1],[agemax agemax],'b');
 % errorbar(ages,2*uncert,'.b')
 errorbar(observedages,2*observeduncert,'.r')
 
-%% Export and run
+%% Export and run image
 
 exportmatrix(sorted,'zircondata.tsv','\t');
 
@@ -56,6 +56,16 @@ title(['N = ' num2str(nzircs)]);
 formatfigure 
 
 
+%% Export and run metropolis sampler
+
+exportmatrix(sorted,'zircondata.tsv','\t');
+
+system('./tzircrystmetropolis 100 10000 MeltsTZircDistribtuion.csv zircondata.tsv > metropolisdata.tsv');
+
+
+load metropolisdata.tsv
+
+figure; plot(metropolisdata)
 
 
 
