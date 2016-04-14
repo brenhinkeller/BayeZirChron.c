@@ -8,6 +8,7 @@
 
 
 #include <stdio.h>
+#include <stdint.h>
 #include <math.h>
 #include <time.h>
 #include <mpi.h>
@@ -17,6 +18,11 @@
 #include "pcg_variants.h"
 #include "gauss.h"
 
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
+
+#define ROOT 0
 
 void drawFromDistribution(pcg32_random_t* rng, const double* dist, const uint32_t distrows, double* x, const uint32_t xrows){
 	const double dist_yrandmax = UINT32_MAX / maxArray(dist,distrows);
@@ -149,6 +155,9 @@ int main(int argc, char **argv){
 	MPI_Comm_size(MPI_COMM_WORLD,&world_size);
 	MPI_Comm_rank(MPI_COMM_WORLD,&world_rank);
 
+	if (world_rank==ROOT){
+		printf("N\tWeighted Mean\tMSWD Test\tYoungest Zircon\tMetropolis Estimate\n");
+	}
 
 	// Get number of simulations per MPI task from command-line argument
 	const uint32_t nsims = (uint32_t)abs(atoi(argv[1]));
@@ -168,18 +177,20 @@ int main(int argc, char **argv){
 	double* synzirc = malloc(Nmax * sizeof(double));
 	double* data = malloc(Nmax * sizeof(double));
 	double* uncert = malloc(Nmax * sizeof(double));
-	double tmin_metropolis_est, tmin_obs, wx, wsigma, mswd;
+	double tmin_metropolis_est, tmin_obs, tmin_mswd_test, wx, wsigma, mswd;
 
 
 	pcg32_random_t rng;
-	pcg32_srandom_r(&rng,time(NULL), clock());
+	pcg32_srandom_r(&rng,time(NULL), world_rank);
 
 	uint32_t Ns[] = {1,2,3,4,5,6,7,8,9,10,20,30,40,50,60,70,80,90,100,200,300,400,500,600,700,800,900,1000};
-	uint32_t nNs = 27;
+	uint32_t nNs = 28;
 
 	double tmin_true = 30;
 	double relagerange = 1/100.0;
 	double reluncert = 0.1/100.0;
+	double absuncert = reluncert*tmin_true;
+	double simspertask = 1;
 	double tmax_true = tmin_true*(1+relagerange);
 
 
@@ -190,15 +201,26 @@ int main(int argc, char **argv){
 			uncert[j] = tmin_true * reluncert;
 		}
 
-		generateSyntheticZirconDataset(&rng, dist, distrows, tmin_true, tmax_true, uncert, data, N);
+		for (j=0; j<simspertask; j++){
+			generateSyntheticZirconDataset(&rng, dist, distrows, tmin_true, tmax_true, uncert, data, N);
 
-		wmean(data, uncert, N, &wx, &wsigma, &mswd);
+			tmin_mswd_test = minArray(data,N);
+			for (k=2; k<N+1; k++){
+				wmean(data, uncert, k, &wx, &wsigma, &mswd);
+				if (mswd > 1){
+					break;
+				}
+				tmin_mswd_test = wx;
+			}
 
-		tmin_obs = minArray(data, N);
+			wmean(data, uncert, N, &wx, &wsigma, &mswd);
 
-		tmin_metropolis_est = findMetropolisEstimate(&rng, dist, distrows, data, uncert, synzirc, N, nsims, nsteps);
+			tmin_obs = minArray(data, N);
 
-		printf("%i\t%g\t%g\t%g\t%g\n", N, tmin_true, wx, tmin_obs, tmin_metropolis_est);
+			tmin_metropolis_est = findMetropolisEstimate(&rng, dist, distrows, data, uncert, synzirc, N, nsims, nsteps);
+
+			printf("%i\t%g\t%g\t%g\t%g\n", N, fabs(wx-tmin_true)/absuncert, fabs(tmin_mswd_test-tmin_true)/absuncert, fabs(tmin_obs-tmin_true)/absuncert, fabs(tmin_metropolis_est-tmin_true)/absuncert);
+		}
 	}
 	
 MPI_Finalize();
