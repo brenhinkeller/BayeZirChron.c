@@ -80,7 +80,7 @@ double testAgeModel(pcg32_random_t* rng, const double* dist, const uint32_t dist
 }
 
 
-double findMetropolisEstimate(pcg32_random_t* rng, const double* dist, const uint32_t distrows, const double* data, const double* uncert, double* synzirc, const uint32_t datarows, const uint32_t nsims, const uint32_t nsteps){
+int findMetropolisEstimate(pcg32_random_t* rng, const double* dist, const uint32_t distrows, const double* data, const double* uncert, double* synzirc, const uint32_t datarows, const uint32_t nsims, const uint32_t nsteps, double* const restrict mu, double* const restrict sigma){
 	const double tmin_obs = minArray(data, datarows);
 	const double tmax_obs = maxArray(data, datarows);
 	const double dt = tmax_obs - tmin_obs;
@@ -137,7 +137,7 @@ double findMetropolisEstimate(pcg32_random_t* rng, const double* dist, const uin
 		tmins[i] = tmin;
 	}
 
-return nanmean(tmins, nsteps);
+return Offset_nanstd(tmins, nsteps, mu, sigma);
 }
 
 
@@ -194,7 +194,9 @@ int main(int argc, char **argv){
 	double* synzirc = malloc(Nmax * sizeof(double));
 	double* data = malloc(Nmax * sizeof(double));
 	double* uncert = malloc(Nmax * sizeof(double));
-	double tmin_metropolis_mswd, tmin_metropolis_est, tmin_obs, tmin_mswd_test, wx, wsigma, mswd;
+	double wx, wsigma, mswd; // For weighted mean
+	double tmin_metropolis_mswd, tmin_metropolis_est, tmin_obs, tmin_mswd_test; // Means
+	double tmin_metropolis_mswd_sigma, tmin_metropolis_est_sigma, tmin_obs_sigma, tmin_mswd_test_sigma; // Standard deviations
 
 	for (i=0; i<nNs; i++){
 		N = Ns[i];
@@ -213,21 +215,25 @@ int main(int argc, char **argv){
 					break;
 				}
 				tmin_mswd_test = wx;
+				tmin_mswd_test_sigma = wsigma;
 			}
 
 			wmean(data, uncert, N, &wx, &wsigma, &mswd);
 
 			tmin_obs = minArray(data, N);
+			tmin_obs_sigma = absuncert;
 
-			tmin_metropolis_est = findMetropolisEstimate(&rng, dist, distrows, data, uncert, synzirc, N, nsims, nsteps);
+			findMetropolisEstimate(&rng, dist, distrows, data, uncert, synzirc, N, nsims, nsteps, &tmin_metropolis_est, &tmin_metropolis_est_sigma);
 
 			if (mswd < 1.0 + 2.0 * sqrt(2.0/(double)(N-1))){
 				tmin_metropolis_mswd = wx;
+				tmin_metropolis_mswd_sigma = wsigma;
 			} else {
 				tmin_metropolis_mswd = tmin_metropolis_est;
+				tmin_metropolis_mswd_sigma = tmin_metropolis_est_sigma;
 			}
 
-			printf("%i\t%g\t%g\t%g\t%g\t%g\n", N, fabs(wx-tmin_true)/absuncert, fabs(tmin_mswd_test-tmin_true)/absuncert, fabs(tmin_obs-tmin_true)/absuncert, fabs(tmin_metropolis_est-tmin_true)/absuncert, fabs(tmin_metropolis_mswd-tmin_true)/absuncert);
+			printf("%i\t%g\t%g\t%g\t%g\t%g\t%g\t%g\t%g\t%g\t%g\n", N, fabs(wx-tmin_true)/absuncert, fabs(tmin_mswd_test-tmin_true)/absuncert, fabs(tmin_obs-tmin_true)/absuncert, fabs(tmin_metropolis_est-tmin_true)/absuncert, fabs(tmin_metropolis_mswd-tmin_true)/absuncert, fabs(wx-tmin_true)/wsigma, fabs(tmin_mswd_test-tmin_true)/tmin_mswd_test_sigma, fabs(tmin_obs-tmin_true)/tmin_obs_sigma, fabs(tmin_metropolis_est-tmin_true)/tmin_metropolis_est_sigma, fabs(tmin_metropolis_mswd-tmin_true)/tmin_metropolis_mswd_sigma);
 		}
 	}
 	
