@@ -48,13 +48,14 @@ void drawFromDistribution(pcg32_random_t* rng, const double* dist, const uint32_
 
 void generateSyntheticZirconDataset(pcg32_random_t* rng, const double* dist, const uint32_t distrows, const double tmin, const double tmax, const double* uncert, double* synzirc, const uint32_t datarows){
 	double dt = fabs(tmax - tmin);
+	double tm = min(tmax,tmin);
 	double r;
 
 	drawFromDistribution(rng, dist, distrows, synzirc, datarows);
 	sort_doubles_descending(synzirc, datarows);
 	for(int i=0; i<datarows; i++){
 		r = pcg_gaussian_ziggurat(rng, uncert[i]);
-		synzirc[i] = (1-synzirc[i]) * dt + tmin + r;
+		synzirc[i] = (1-synzirc[i]) * dt + tm + r;
 
 	}
 }
@@ -99,17 +100,23 @@ double findMetropolisEstimate(pcg32_random_t* rng, const double* dist, const uin
 
 	for (i=0; i<nsteps; i++){
 
-		// Uniformly adjust either the upper or lower bound age
-		r = pcg32_random_r(rng)/(double)UINT32_MAX;
-		if (r<0.5){
-			tmin_proposed = tmin + pcg_gaussian_ziggurat(rng, tmin_step);
-			if (tmin_proposed > tmax)
-				tmax_proposed = tmax;
-		} else {
-			tmin_proposed = tmin;
-			tmax_proposed = tmax + pcg_gaussian_ziggurat(rng, tmax_step);
-		}
+//		// Uniformly adjust either the upper or lower bound age
+//		r = pcg32_random_r(rng)/(double)UINT32_MAX;
+//		if (r<0.5){
+//			tmin_proposed = tmin + pcg_gaussian_ziggurat(rng, tmin_step);
+//			if (tmin_proposed > tmax)
+//				tmax_proposed = tmax;
+//		} else {
+//			tmin_proposed = tmin;
+//			tmax_proposed = tmax + pcg_gaussian_ziggurat(rng, tmax_step);
+//		}
 
+
+		// Uniformly adjust upper and lower bound age
+		tmin_proposed = tmin + pcg_gaussian_ziggurat(rng, tmin_step);
+		tmax_proposed = tmax + pcg_gaussian_ziggurat(rng, tmax_step);
+
+		// Swap upper and lower bound if they get reversed
 		if (tmin_proposed>tmax_proposed){
 			r = tmin_proposed;
 			tmin_proposed = tmax_proposed;
@@ -156,7 +163,7 @@ int main(int argc, char **argv){
 	MPI_Comm_rank(MPI_COMM_WORLD,&world_rank);
 
 	if (world_rank==ROOT){
-		printf("N\tWeighted Mean\tMSWD Test\tYoungest Zircon\tMetropolis Estimate\n");
+		printf("N\tWeighted Mean\tMSWD Test\tYoungest Zircon\tMetropolis Estimate\tMetropolis+MSWD\n");
 	}
 
 	// Get number of simulations per MPI task from command-line argument
@@ -167,32 +174,27 @@ int main(int argc, char **argv){
 	// Import data	
 	const double* dist = csvparseflat(argv[3],'\t', &distrows, &distcolumns);	
 
-//	printf("distribution size: %i, %i\n", distrows, distcolumns);
-//	printf("data size: %i, %i\n", datarows, datacolumns);
+	// Declare various variables
+	pcg32_random_t rng;
+	pcg32_srandom_r(&rng,time(NULL), world_rank);
 
 	const uint32_t Nmin = 1;
 	const uint32_t Nmax = 1000;
+	uint32_t Ns[] = {1,2,3,4,5,6,7,8,9,10,20,30,40,50,60,70,80,90,100,200,300,400,500,600,700,800,900,1000};
+	uint32_t nNs = 28;
+
+	double tmin_true = 100;
+	double relagerange = 0.1/100.0;
+	double reluncert = 0.1/100.0;
+	double absuncert = reluncert*tmin_true;
+	double simspertask = 2;
+	double tmax_true = tmin_true*(1+relagerange);
 
 
 	double* synzirc = malloc(Nmax * sizeof(double));
 	double* data = malloc(Nmax * sizeof(double));
 	double* uncert = malloc(Nmax * sizeof(double));
-	double tmin_metropolis_est, tmin_obs, tmin_mswd_test, wx, wsigma, mswd;
-
-
-	pcg32_random_t rng;
-	pcg32_srandom_r(&rng,time(NULL), world_rank);
-
-	uint32_t Ns[] = {1,2,3,4,5,6,7,8,9,10,20,30,40,50,60,70,80,90,100,200,300,400,500,600,700,800,900,1000};
-	uint32_t nNs = 28;
-
-	double tmin_true = 30;
-	double relagerange = 1/100.0;
-	double reluncert = 0.1/100.0;
-	double absuncert = reluncert*tmin_true;
-	double simspertask = 1;
-	double tmax_true = tmin_true*(1+relagerange);
-
+	double tmin_metropolis_mswd, tmin_metropolis_est, tmin_obs, tmin_mswd_test, wx, wsigma, mswd;
 
 	for (i=0; i<nNs; i++){
 		N = Ns[i];
@@ -207,7 +209,7 @@ int main(int argc, char **argv){
 			tmin_mswd_test = minArray(data,N);
 			for (k=2; k<N+1; k++){
 				wmean(data, uncert, k, &wx, &wsigma, &mswd);
-				if (mswd > 1){
+				if (mswd > 1.0 + 2.0 * sqrt(2.0/(double)(k-1))){
 					break;
 				}
 				tmin_mswd_test = wx;
@@ -219,7 +221,13 @@ int main(int argc, char **argv){
 
 			tmin_metropolis_est = findMetropolisEstimate(&rng, dist, distrows, data, uncert, synzirc, N, nsims, nsteps);
 
-			printf("%i\t%g\t%g\t%g\t%g\n", N, fabs(wx-tmin_true)/absuncert, fabs(tmin_mswd_test-tmin_true)/absuncert, fabs(tmin_obs-tmin_true)/absuncert, fabs(tmin_metropolis_est-tmin_true)/absuncert);
+			if (mswd < 1.0 + 2.0 * sqrt(2.0/(double)(N-1))){
+				tmin_metropolis_mswd = wx;
+			} else {
+				tmin_metropolis_mswd = tmin_metropolis_est;
+			}
+
+			printf("%i\t%g\t%g\t%g\t%g\t%g\n", N, fabs(wx-tmin_true)/absuncert, fabs(tmin_mswd_test-tmin_true)/absuncert, fabs(tmin_obs-tmin_true)/absuncert, fabs(tmin_metropolis_est-tmin_true)/absuncert, fabs(tmin_metropolis_mswd-tmin_true)/absuncert);
 		}
 	}
 	
