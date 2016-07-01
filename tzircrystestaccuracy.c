@@ -81,15 +81,18 @@ double testAgeModel(pcg32_random_t* rng, const double* dist, const uint32_t dist
 
 
 int findMetropolisEstimate(pcg32_random_t* rng, const double* dist, const uint32_t distrows, const double* data, const double* uncert, double* synzirc, const uint32_t datarows, const uint32_t nsims, const uint32_t nsteps, double* const restrict mu, double* const restrict sigma){
+	const int burnin = 1000;
 	const double tmin_obs = minArray(data, datarows);
 	const double tmax_obs = maxArray(data, datarows);
 	const double dt = tmax_obs - tmin_obs;
+
 
 	double tmin, tmax, theta, tmin_proposed, tmax_proposed, theta_proposed;
 	double r, tmin_step=dt/10, tmax_step=dt/10;
 	uint32_t i;
 
-	double tmins[nsteps];
+	double tmins[nsteps+burnin];
+
 	
 	tmin = tmin_obs;
 	tmax = tmax_obs;
@@ -98,7 +101,7 @@ int findMetropolisEstimate(pcg32_random_t* rng, const double* dist, const uint32
 	theta = testAgeModel(rng, dist, distrows, data, uncert, synzirc, datarows, nsims, tmin_proposed, tmax_proposed);
 
 
-	for (i=0; i<nsteps; i++){
+	for (i=0; i<nsteps+burnin; i++){
 
 //		// Uniformly adjust either the upper or lower bound age
 //		r = pcg32_random_r(rng)/(double)UINT32_MAX;
@@ -137,7 +140,7 @@ int findMetropolisEstimate(pcg32_random_t* rng, const double* dist, const uint32
 		tmins[i] = tmin;
 	}
 
-return Offset_nanstd(tmins, nsteps, mu, sigma);
+return Offset_nanstd(&tmins[burnin], nsteps, mu, sigma);
 }
 
 
