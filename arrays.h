@@ -688,19 +688,25 @@ int standardize(double* restrict x, const uint32_t n){
 int wmean(const double* x, const double* sigma, const uint32_t n, double* wx, double* wsigma, double* mswd){
 	uint32_t i;
 	double s0 = 0, s1 = 0,  s2 = 0, s3 = 0;
-	for(i=0; i<n; i++){
-		s0 += 1 / sigma[i];
-		s1 += x[i] / (sigma[i]*sigma[i]);
-		s2 += 1 / (sigma[i]*sigma[i]);
-	}
-	*wx = s1/s2;
 
-	for(i=0; i<n; i++){
-		s3 += (x[i] - *wx)*(x[i] - *wx) / (sigma[i]*sigma[i]);
-	}
+	if (n==1){
+		*wx = x[0];
+		*mswd = NAN;
+		*wsigma = sigma[0];
+	} else {
+		for(i=0; i<n; i++){
+			s0 += 1 / sigma[i];
+			s1 += x[i] / (sigma[i]*sigma[i]);
+			s2 += 1 / (sigma[i]*sigma[i]);
+		}
+		*wx = s1/s2;
 
-	*mswd = s3 / (n-1);
-	*wsigma = sqrt(*mswd/s0);
+		for(i=0; i<n; i++){
+			s3 += (x[i] - *wx)*(x[i] - *wx) / (sigma[i]*sigma[i]);
+		}
+		*mswd = s3 / (n-1);
+		*wsigma = sqrt(*mswd/s0);
+	}
 
 	return 0;
 }
