@@ -691,7 +691,7 @@ int wmean(const double* x, const double* sigma, const uint32_t n, double* wx, do
 
 	if (n==1){
 		*wx = x[0];
-		*mswd = NAN;
+		*mswd = 0;
 		*wsigma = sigma[0];
 	} else {
 		for(i=0; i<n; i++){
