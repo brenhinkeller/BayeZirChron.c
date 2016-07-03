@@ -707,8 +707,34 @@ int wmean(const double* x, const double* sigma, const uint32_t n, double* wx, do
 		*mswd = s3 / (n-1);
 		*wsigma = sqrt(*mswd/s0);
 	}
+	return 0;
+}
+
+// Calculate a weigted mean, including MSWD, assuming experimental uncertainties are not overestimated
+int awmean(const double* x, const double* sigma, const uint32_t n, double* wx, double* wsigma, double* mswd){
+	uint32_t i;
+	double s0 = 0, s1 = 0,  s2 = 0, s3 = 0;
+
+	if (n==1){
+		*wx = x[0];
+		*mswd = 0;
+		*wsigma = sigma[0];
+	} else {
+		for(i=0; i<n; i++){
+			s0 += 1 / sigma[i];
+			s1 += x[i] / (sigma[i]*sigma[i]);
+			s2 += 1 / (sigma[i]*sigma[i]);
+		}
+		*wx = s1/s2;
+
+		for(i=0; i<n; i++){
+			s3 += (x[i] - *wx)*(x[i] - *wx) / (sigma[i]*sigma[i]);
+		}
+		*mswd = s3 / (n-1);
+		*wsigma = sqrt(*mswd/s0);
+	}
 	
-	// Assume experimintal uncertainties are minima:
+	// Assume experimintal uncertainties are not overestimated:
 	// Do not allow uncertainty to fall below sigma/sqrt(n)
 	double maxprec = nanmean(sigma, n) / (double)sqrt(n);
 	if (*wsigma<maxprec) {
@@ -719,9 +745,8 @@ int wmean(const double* x, const double* sigma, const uint32_t n, double* wx, do
 }
 
 
-
-// From wikipedia (public domain)
 /* Comparison function. Receives two generic (void) pointers. */
+// Adapted from wikipedia example (public domain)
 int compare_ints(const void *p, const void *q){
 	int x = *(const int *)p;
 	int y = *(const int *)q;

@@ -1,5 +1,5 @@
 #!/bin/bash
-#PBS -l nodes=40:ppn=16,walltime=00:59:00
+#PBS -l nodes=20:ppn=16,walltime=00:40:00
 #PBS -m e
 #PBS -M cbkeller@princeton.edu
 
