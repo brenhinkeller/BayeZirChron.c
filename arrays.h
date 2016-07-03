@@ -707,6 +707,13 @@ int wmean(const double* x, const double* sigma, const uint32_t n, double* wx, do
 		*mswd = s3 / (n-1);
 		*wsigma = sqrt(*mswd/s0);
 	}
+	
+	// Assume experimintal uncertainties are minima:
+	// Do not allow uncertainty to fall below sigma/sqrt(n)
+	double maxprec = nanmean(sigma, n) / (double)sqrt(n);
+	if (*wsigma<maxprec) {
+		*wsigma = maxprec;
+	}
 
 	return 0;
 }
