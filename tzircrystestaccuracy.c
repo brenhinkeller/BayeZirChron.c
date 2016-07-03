@@ -81,14 +81,14 @@ double testAgeModel(pcg32_random_t* rng, const double* dist, const uint32_t dist
 
 
 int findMetropolisEstimate(pcg32_random_t* rng, const double* dist, const uint32_t distrows, const double* data, const double* uncert, double* synzirc, const uint32_t datarows, const uint32_t nsims, const uint32_t nsteps, double* const restrict mu, double* const restrict sigma){
-	const int burnin = 1000;
+	const uint32_t burnin = nsteps/10;
 	const double tmin_obs = minArray(data, datarows);
 	const double tmax_obs = maxArray(data, datarows);
-	const double dt = tmax_obs - tmin_obs;
+	const double dt = tmax_obs - tmin_obs + uncert[0] + uncert[datarows-1];
 
 
 	double tmin, tmax, theta, tmin_proposed, tmax_proposed, theta_proposed;
-	double r, tmin_step=dt/10, tmax_step=dt/10;
+	double r, tmin_step=dt/(double)datarows, tmax_step=dt/(double)datarows;
 	uint32_t i;
 
 	double tmins[nsteps+burnin];
@@ -131,7 +131,13 @@ int findMetropolisEstimate(pcg32_random_t* rng, const double* dist, const uint32
 
 		// Decide to accept or reject the proposal
 		r = pcg32_random_r(rng)/(double)UINT32_MAX;
-		if (r < pow(10,theta_proposed-theta)){	
+		if (r < pow(10,theta_proposed-theta)){
+			if (tmin_proposed != tmin){
+				tmin_step = fabs(tmin_proposed-tmin)*2.718;
+			} 
+			if (tmax_proposed != tmax){
+				tmax_step = fabs(tmax_proposed-tmax)*2.718;
+			}
 			tmin = tmin_proposed;
 			tmax = tmax_proposed;
 			theta = theta_proposed;
@@ -182,9 +188,9 @@ int main(int argc, char **argv){
 	pcg32_srandom_r(&rng,time(NULL), world_rank);
 
 	const uint32_t Nmin = 1;
-	const uint32_t Nmax = 1000;
-	uint32_t Ns[] = {1,2,3,4,5,6,7,8,9,10,20,30,40,50,60,70,80,90,100,200,300,400,500,600,700,800,900,1000};
-	uint32_t nNs = 28;
+	const uint32_t Nmax = 1024;
+	uint32_t Ns[] = {1,2,3,4,6,8,11,16,23,32,45,64,91,128,181,256,362,512,724,1024};
+	uint32_t nNs = 20;
 
 	double tmin_true = 100;
 	double relagerange = 0.1/100.0;
@@ -211,7 +217,11 @@ int main(int argc, char **argv){
 		for (j=0; j<simspertask; j++){
 			generateSyntheticZirconDataset(&rng, dist, distrows, tmin_true, tmax_true, uncert, data, N);
 
-			tmin_mswd_test = minArray(data,N);
+			findMetropolisEstimate(&rng, dist, distrows, data, uncert, synzirc, N, nsims, nsteps, &tmin_metropolis_est, &tmin_metropolis_est_sigma);
+			
+			sort_doubles(data, N);
+			tmin_mswd_test = data[0];
+			tmin_mswd_test_sigma = absuncert;
 			for (k=2; k<N+1; k++){
 				wmean(data, uncert, k, &wx, &wsigma, &mswd);
 				if (mswd > 1.0 + 2.0 * sqrt(2.0/(double)(k-1))){
@@ -226,7 +236,6 @@ int main(int argc, char **argv){
 			tmin_obs = minArray(data, N);
 			tmin_obs_sigma = absuncert;
 
-			findMetropolisEstimate(&rng, dist, distrows, data, uncert, synzirc, N, nsims, nsteps, &tmin_metropolis_est, &tmin_metropolis_est_sigma);
 
 			if (mswd < 1.0 + 2.0 * sqrt(2.0/(double)(N-1))){
 				tmin_metropolis_mswd = wx;
