@@ -5,7 +5,7 @@ if ~exist('dist','var'); load zircondistribution; end;
 
 %% draw from new PDF
 
-nzircs=1000;
+nzircs=1;
 agemax = 27.3;
 agemin = 27.0;
 
@@ -15,7 +15,7 @@ agerange = agemax - agemin;
 
 ages = agerange.*(1-randsample(xi,nzircs,true,dist)) + agemin;
 ages = sort(ages)';
-uncert = random('Gamma',5,0.02,size(ages))/100 .* ages;
+uncert = random('Gamma',5,0.02,size(ages))/1 .* ages;
 observedages = ages + randn(size(ages)).*uncert;
 
 
@@ -27,7 +27,6 @@ observeduncert = sorted(:,2);
 figure; hold on;
 plot([0,nzircs+1],[agemin agemin],'b');
 plot([0,nzircs+1],[agemax agemax],'b');
-% errorbar(ages,2*uncert,'.b')
 errorbar(observedages,2*observeduncert,'.r')
 
 %% Export and run image
@@ -45,7 +44,6 @@ y = imagedata(2:end,1);
 
 figure; imagesc(x,y,im)
 
-
 hold on; plot(agemax,agemin,'+k','MarkerSize',10,'LineWidth',1.5)
 hold on; plot(max(observedages),min(observedages),'.k','MarkerSize',10)
 hold on; plot(wmean(observedages,observeduncert),wmean(observedages,observeduncert),'.m','MarkerSize',10)
@@ -59,15 +57,30 @@ formatfigure
 %% Export and run metropolis sampler
 
 exportmatrix(sorted,'zircondata.tsv','\t');
-
-system('./tzircrystmetropolis 100 10000 MeltsTZircDistribtuion.csv zircondata.tsv > metropolisdata.tsv');
-
-
+tic;
+system('./tzircrystmetropolis 100 100000 2.9 MeltsTZircDistribtuion.csv zircondata.tsv > metropolisdata.tsv');
+toc
 load metropolisdata.tsv
 
-figure; plot(metropolisdata)
+figure; plot(metropolisdata(:,3))
+figure; plot(metropolisdata(:,1:2))
+transition_probability=sum(diff(metropolisdata(:,3))~=0)./length(metropolisdata(:,3))
 
 
+
+%% Check optimal step factor
+stepfactor = (1.9:0.1:3)';
+transition_probability=NaN(size(stepfactor));
+
+pool=gcp; %Start a parellel processing pool if there isn't one already
+parfor i=1:length(stepfactor);
+    transition_probability(i) = getTransitionProbability(stepfactor(i))
+%     system(['./tzircrystmetropolis 100 100000 ' num2str(stepfactor(i)) ' MeltsTZircDistribtuion.csv zircondata.tsv > metropolisdata.tsv']);
+%     load metropolisdata.tsv
+%     transition_probability(i) = sum(diff(metropolisdata(:,3))~=0)./length(metropolisdata(:,3));
+end
+
+figure; plot(stepfactor,transition_probability,'.','MarkerSize',20)
 
 %% Try and find original min and max
 % 
