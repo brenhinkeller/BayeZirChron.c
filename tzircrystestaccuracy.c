@@ -63,24 +63,6 @@ void generateSyntheticZirconDataset(pcg32_random_t* rng, const double* dist, con
 	}
 }
 
-//double compareZirconPopulations(const double* data, const double* uncert, const double* synzirc, const uint32_t rows){
-//	double loglikelihood = 0;
-//	for (int i=0; i<rows; i++){
-//		loglikelihood += log10( 1 / (uncert[i] * sqrt(2*M_PI)) * exp( - (synzirc[i]-data[i])*(synzirc[i]-data[i]) / (2*uncert[i]*uncert[i]) ));
-//	}
-//	return loglikelihood / (double)rows;
-//}
-//
-//
-//double testAgeModel(pcg32_random_t* rng, const double* dist, const uint32_t distrows, const double* data, const double* uncert, double* synzirc, const uint32_t datarows, const uint32_t nsims, const double tmin, const double tmax){
-//	double loglikelihood = 0;
-//	for (int i=0; i<nsims; i++){
-//		generateSyntheticZirconDataset(rng, dist, distrows, tmin, tmax, uncert, synzirc, datarows);
-//		sort_doubles(synzirc, datarows);
-//		loglikelihood += compareZirconPopulations(data, uncert, synzirc, datarows);
-//	}
-//	return loglikelihood / (double)nsims;
-//}
 
 double checkZirconLikelihood(const double* restrict dist, const uint32_t distrows, const double* restrict data, const double* restrict uncert, const uint32_t datarows, const double tmin, const double tmax){
 	double distx, likelihood, loglikelihood = 0;
@@ -98,7 +80,7 @@ double checkZirconLikelihood(const double* restrict dist, const uint32_t distrow
 }
 
 int findMetropolisEstimate(pcg32_random_t* rng, const double* dist, const uint32_t distrows, const double* data, const double* uncert, const uint32_t datarows, const uint32_t nsteps, double* const restrict mu, double* const restrict sigma){
-	const uint32_t burnin = 0; //nsteps/10;
+	const uint32_t burnin = nsteps/10;
 	const double tmin_obs = minArray(data, datarows);
 	const double tmax_obs = maxArray(data, datarows);
 	const double dt = tmax_obs - tmin_obs + uncert[0] + uncert[datarows-1];
@@ -171,8 +153,8 @@ int main(int argc, char **argv){
 	int world_size, world_rank, rc;
 
 	//Check input arguments
-	if (argc != 4) {
-		fprintf(stderr,"USAGE: %s <nsims> <nsteps> <distribution.tsv>\n", argv[0]);
+	if (argc != 5) {
+		fprintf(stderr,"USAGE: %s <sims-per-task> <nsteps> <dt/sigma> <distribution.tsv>\n", argv[0]);
 		exit(1);
 	}
 
@@ -191,12 +173,15 @@ int main(int argc, char **argv){
 	}
 
 	// Get number of simulations per MPI task from command-line argument
-	const uint32_t nsims = (uint32_t)abs(atoi(argv[1]));
+	const uint32_t simspertask = (uint32_t)abs(atoi(argv[1]));
 	// Get number of steps for metropolis walker to take	
 	const uint32_t nsteps = (uint32_t)abs(atoi(argv[2]));
+	// Get dt/sigma value to run at	
+	const double dt_sigma = fabs(atof(argv[3]));
+
 
 	// Import data	
-	const double* dist = csvparseflat(argv[3],'\t', &distrows, &distcolumns);	
+	const double* dist = csvparseflat(argv[4],'\t', &distrows, &distcolumns);	
 
 	// Declare various variables
 	pcg32_random_t rng;
@@ -208,10 +193,9 @@ int main(int argc, char **argv){
 	uint32_t nNs = 20;
 
 	double tmin_true = 100;
-	double relagerange = 0.5/100.0;
 	double reluncert = 0.1/100.0;
+	double relagerange = reluncert * dt_sigma;
 	double absuncert = reluncert*tmin_true;
-	double simspertask = nsims/world_size;
 	double tmax_true = tmin_true*(1+relagerange);
 
 

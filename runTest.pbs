@@ -4,4 +4,4 @@
 #PBS -M cbkeller@princeton.edu
 
 module load openmpi
-mpiexec ./tzircrystestaccuracy 100 10000 MeltsTZircDistribtuion.tsv > eruptionestimates1.tsv
+mpiexec ./tzircrystestaccuracy 4 10000 1 MeltsTZircDistribtuion.tsv > eruptionestimates1.tsv
