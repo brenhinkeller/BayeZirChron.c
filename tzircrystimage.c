@@ -70,6 +70,20 @@ double testAgeModel(pcg32_random_t* rng, const double* dist, const uint32_t dist
 	return loglikelihood / (double)nsims;
 }
 
+double checkZirconLikelihood(const double* restrict dist, const uint32_t distrows, const double* restrict data, const double* restrict uncert, const uint32_t datarows, const double tmin, const double tmax){
+	double distx, likelihood, loglikelihood = 0;
+	const double dt = fabs(tmax-tmin);
+
+	for (int j=0; j<datarows; j++){
+		likelihood = 0;
+		for (int i=0; i<distrows; i++){
+			distx = tmax - dt*i/(distrows-1);
+			likelihood += dist[i] / (distrows * uncert[j] * sqrt(2*M_PI)) * exp( -(distx-data[j])*(distx-data[j]) / (2*uncert[j]*uncert[j]) );
+		}
+		loglikelihood += log10(likelihood);
+	}
+	return loglikelihood;
+}
 
 int main(int argc, char **argv){
 	uint32_t distrows, distcolumns;
@@ -116,7 +130,8 @@ int main(int argc, char **argv){
 
 		for (tu = tmax-dt; tu < tmax+dt;  tu += dt/50.0){
 			if(tu>tl){
-				printf("%g\t", testAgeModel(&rng, dist, distrows, data, &data[datarows*1], synzirc, datarows, nsims, tl, tu));
+//				printf("%g\t", testAgeModel(&rng, dist, distrows, data, &data[datarows*1], synzirc, datarows, nsims, tl, tu));
+				printf("%g\t", checkZirconLikelihood(dist, distrows, data, &data[datarows*1], datarows, tl, tu));
 			} else {
 				printf("NaN\t");
 			}

@@ -31,8 +31,8 @@ void drawFromDistribution(pcg32_random_t* rng, const double* dist, const uint32_
 	double rx, ry, y;
  
 	for (int i=0; i<xrows; i++){
-		x[i] = -1;
-		while (x[i] == -1){
+		x[i] = NAN;
+		while (isnan(x[i])){
 			// Pick random x value
 			rx = pcg32_random_r(rng) / dist_xrandmax;
 			// Interpolate corresponding distribution value
@@ -47,41 +47,58 @@ void drawFromDistribution(pcg32_random_t* rng, const double* dist, const uint32_
 }
 
 void generateSyntheticZirconDataset(pcg32_random_t* rng, const double* dist, const uint32_t distrows, const double tmin, const double tmax, const double* uncert, double* synzirc, const uint32_t datarows){
-	double dt = fabs(tmax - tmin);
-	double tm = min(tmax,tmin);
+	const double dt = fabs(tmax - tmin);
+	const double tm = min(tmax,tmin);
 	double r;
 
 	drawFromDistribution(rng, dist, distrows, synzirc, datarows);
-	sort_doubles_descending(synzirc, datarows);
+//	sort_doubles_descending(synzirc, datarows);
 	for(int i=0; i<datarows; i++){
 		r = pcg_gaussian_ziggurat(rng, uncert[i]);
+		while (isnan(r)){
+			r = pcg_gaussian_ziggurat(rng, uncert[i]);
+		}
+
 		synzirc[i] = (1-synzirc[i]) * dt + tm + r;
-
 	}
 }
 
-double compareZirconPopulations(const double* data, const double* uncert, const double* synzirc, const uint32_t rows){
-	double loglikelihood = 0;
-	for (int i=0; i<rows; i++){
-		loglikelihood += log10( 1 / (uncert[i] * sqrt(2*M_PI)) * exp( - (synzirc[i]-data[i])*(synzirc[i]-data[i]) / (2*uncert[i]*uncert[i]) ));
+//double compareZirconPopulations(const double* data, const double* uncert, const double* synzirc, const uint32_t rows){
+//	double loglikelihood = 0;
+//	for (int i=0; i<rows; i++){
+//		loglikelihood += log10( 1 / (uncert[i] * sqrt(2*M_PI)) * exp( - (synzirc[i]-data[i])*(synzirc[i]-data[i]) / (2*uncert[i]*uncert[i]) ));
+//	}
+//	return loglikelihood / (double)rows;
+//}
+//
+//
+//double testAgeModel(pcg32_random_t* rng, const double* dist, const uint32_t distrows, const double* data, const double* uncert, double* synzirc, const uint32_t datarows, const uint32_t nsims, const double tmin, const double tmax){
+//	double loglikelihood = 0;
+//	for (int i=0; i<nsims; i++){
+//		generateSyntheticZirconDataset(rng, dist, distrows, tmin, tmax, uncert, synzirc, datarows);
+//		sort_doubles(synzirc, datarows);
+//		loglikelihood += compareZirconPopulations(data, uncert, synzirc, datarows);
+//	}
+//	return loglikelihood / (double)nsims;
+//}
+
+double checkZirconLikelihood(const double* restrict dist, const uint32_t distrows, const double* restrict data, const double* restrict uncert, const uint32_t datarows, const double tmin, const double tmax){
+	double distx, likelihood, loglikelihood = 0;
+	const double dt = fabs(tmax-tmin);
+
+	for (int j=0; j<datarows; j++){
+		likelihood = 0;
+		for (int i=0; i<distrows; i++){
+			distx = tmax - dt*i/(distrows-1);
+			likelihood += dist[i] / (distrows * uncert[j] * sqrt(2*M_PI)) * exp( -(distx-data[j])*(distx-data[j]) / (2*uncert[j]*uncert[j]) );
+		}
+		loglikelihood += log10(likelihood);
 	}
-	return loglikelihood / (double)rows;
+	return loglikelihood;
 }
 
-
-double testAgeModel(pcg32_random_t* rng, const double* dist, const uint32_t distrows, const double* data, const double* uncert, double* synzirc, const uint32_t datarows, const uint32_t nsims, const double tmin, const double tmax){
-	double loglikelihood = 0;
-	for (int i=0; i<nsims; i++){
-		generateSyntheticZirconDataset(rng, dist, distrows, tmin, tmax, uncert, synzirc, datarows);
-		sort_doubles(synzirc, datarows);
-		loglikelihood += compareZirconPopulations(data, uncert, synzirc, datarows);
-	}
-	return loglikelihood / (double)nsims;
-}
-
-
-int findMetropolisEstimate(pcg32_random_t* rng, const double* dist, const uint32_t distrows, const double* data, const double* uncert, double* synzirc, const uint32_t datarows, const uint32_t nsims, const uint32_t nsteps, double* const restrict mu, double* const restrict sigma){
-	const uint32_t burnin = nsteps/10;
+int findMetropolisEstimate(pcg32_random_t* rng, const double* dist, const uint32_t distrows, const double* data, const double* uncert, const uint32_t datarows, const uint32_t nsteps, double* const restrict mu, double* const restrict sigma){
+	const uint32_t burnin = 0; //nsteps/10;
 	const double tmin_obs = minArray(data, datarows);
 	const double tmax_obs = maxArray(data, datarows);
 	const double dt = tmax_obs - tmin_obs + uncert[0] + uncert[datarows-1];
@@ -98,26 +115,24 @@ int findMetropolisEstimate(pcg32_random_t* rng, const double* dist, const uint32
 	tmax = tmax_obs;
 	tmin_proposed = tmin_obs;
 	tmax_proposed = tmax_obs;
-	theta = testAgeModel(rng, dist, distrows, data, uncert, synzirc, datarows, nsims, tmin_proposed, tmax_proposed);
-
+	theta =  checkZirconLikelihood(dist, distrows, data, uncert, datarows, tmin_proposed, tmax_proposed);
 
 	for (i=0; i<nsteps+burnin; i++){
 
-//		// Uniformly adjust either the upper or lower bound age
-//		r = pcg32_random_r(rng)/(double)UINT32_MAX;
-//		if (r<0.5){
-//			tmin_proposed = tmin + pcg_gaussian_ziggurat(rng, tmin_step);
-//			if (tmin_proposed > tmax)
-//				tmax_proposed = tmax;
-//		} else {
-//			tmin_proposed = tmin;
-//			tmax_proposed = tmax + pcg_gaussian_ziggurat(rng, tmax_step);
-//		}
+		// Uniformly adjust either the upper or lower bound age
+		r = pcg32_random_r(rng)/(double)UINT32_MAX;
+		if (r<0.5){
+			tmin_proposed = tmin + pcg_gaussian_ziggurat(rng, tmin_step);
+			tmax_proposed = tmax;
+		} else {
+			tmin_proposed = tmin;
+			tmax_proposed = tmax + pcg_gaussian_ziggurat(rng, tmax_step);
+		}
 
 
-		// Uniformly adjust upper and lower bound age
-		tmin_proposed = tmin + pcg_gaussian_ziggurat(rng, tmin_step);
-		tmax_proposed = tmax + pcg_gaussian_ziggurat(rng, tmax_step);
+//		// Uniformly adjust upper and lower bound age
+//		tmin_proposed = tmin + pcg_gaussian_ziggurat(rng, tmin_step);
+//		tmax_proposed = tmax + pcg_gaussian_ziggurat(rng, tmax_step);
 
 		// Swap upper and lower bound if they get reversed
 		if (tmin_proposed>tmax_proposed){
@@ -127,16 +142,16 @@ int findMetropolisEstimate(pcg32_random_t* rng, const double* dist, const uint32
 		}
 
 		// Calculate log likelihood for new proposal
-		theta_proposed = testAgeModel(rng, dist, distrows, data, uncert, synzirc, datarows, nsims, tmin_proposed, tmax_proposed);
+		theta_proposed = checkZirconLikelihood(dist, distrows, data, uncert, datarows, tmin_proposed, tmax_proposed);
 
 		// Decide to accept or reject the proposal
 		r = pcg32_random_r(rng)/(double)UINT32_MAX;
 		if (r < pow(10,theta_proposed-theta)){
 			if (tmin_proposed != tmin){
-				tmin_step = fabs(tmin_proposed-tmin)*2.718;
+				tmin_step = fabs(tmin_proposed-tmin)*2.9;
 			} 
 			if (tmax_proposed != tmax){
-				tmax_step = fabs(tmax_proposed-tmax)*2.718;
+				tmax_step = fabs(tmax_proposed-tmax)*2.9;
 			}
 			tmin = tmin_proposed;
 			tmax = tmax_proposed;
@@ -172,7 +187,7 @@ int main(int argc, char **argv){
 	MPI_Comm_rank(MPI_COMM_WORLD,&world_rank);
 
 	if (world_rank==ROOT){
-		printf("N\tWeighted Mean\tMSWD Test\tYoungest Zircon\tMetropolis Estimate\tMetropolis+MSWD\n");
+		printf("N\tMSWD\tWeighted Mean err\tMSWD Test err\tYoungest Zircon err\tMetropolis Estimate err\tMetropolis+MSWD err\tWeighted Mean err/sigma\tMSWD Test err/sigma\tYoungest Zircon err/sigma\tMetropolis Estimate err/sigma\tMetropolis+MSWD err/sigma\n");
 	}
 
 	// Get number of simulations per MPI task from command-line argument
@@ -193,14 +208,14 @@ int main(int argc, char **argv){
 	uint32_t nNs = 20;
 
 	double tmin_true = 100;
-	double relagerange = 0.1/100.0;
+	double relagerange = 0.5/100.0;
 	double reluncert = 0.1/100.0;
 	double absuncert = reluncert*tmin_true;
-	double simspertask = 2;
+	double simspertask = nsims/world_size;
 	double tmax_true = tmin_true*(1+relagerange);
 
 
-	double* synzirc = malloc(Nmax * sizeof(double));
+//	double* synzirc = malloc(Nmax * sizeof(double));
 	double* data = malloc(Nmax * sizeof(double));
 	double* uncert = malloc(Nmax * sizeof(double));
 	double wx, wsigma, mswd; // For weighted mean
@@ -217,7 +232,7 @@ int main(int argc, char **argv){
 		for (j=0; j<simspertask; j++){
 			generateSyntheticZirconDataset(&rng, dist, distrows, tmin_true, tmax_true, uncert, data, N);
 
-			findMetropolisEstimate(&rng, dist, distrows, data, uncert, synzirc, N, nsims, nsteps, &tmin_metropolis_est, &tmin_metropolis_est_sigma);
+			findMetropolisEstimate(&rng, dist, distrows, data, uncert, N, nsteps, &tmin_metropolis_est, &tmin_metropolis_est_sigma);
 			
 			sort_doubles(data, N);
 			tmin_mswd_test = data[0];
@@ -244,6 +259,7 @@ int main(int argc, char **argv){
 				tmin_metropolis_mswd = tmin_metropolis_est;
 				tmin_metropolis_mswd_sigma = tmin_metropolis_est_sigma;
 			}
+
 
 			printf("%i\t%g\t%g\t%g\t%g\t%g\t%g\t%g\t%g\t%g\t%g\t%g\n", N, mswd, fabs(wx-tmin_true)/absuncert, fabs(tmin_mswd_test-tmin_true)/absuncert, fabs(tmin_obs-tmin_true)/absuncert, fabs(tmin_metropolis_est-tmin_true)/absuncert, fabs(tmin_metropolis_mswd-tmin_true)/absuncert, fabs(wx-tmin_true)/wsigma, fabs(tmin_mswd_test-tmin_true)/tmin_mswd_test_sigma, fabs(tmin_obs-tmin_true)/tmin_obs_sigma, fabs(tmin_metropolis_est-tmin_true)/tmin_metropolis_est_sigma, fabs(tmin_metropolis_mswd-tmin_true)/tmin_metropolis_mswd_sigma);
 		}

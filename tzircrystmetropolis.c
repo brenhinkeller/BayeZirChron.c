@@ -69,14 +69,30 @@ double testAgeModel(pcg32_random_t* rng, const double* dist, const uint32_t dist
 }
 
 
+
+double checkZirconLikelihood(const double* restrict dist, const uint32_t distrows, const double* restrict data, const double* restrict uncert, const uint32_t datarows, const double tmin, const double tmax){
+	double distx, likelihood, loglikelihood = 0;
+	const double dt = fabs(tmax-tmin);
+
+	for (int j=0; j<datarows; j++){
+		likelihood = 0;
+		for (int i=0; i<distrows; i++){
+			distx = tmax - dt*i/(distrows-1);
+			likelihood += dist[i] / (distrows * uncert[j] * sqrt(2*M_PI)) * exp( -(distx-data[j])*(distx-data[j]) / (2*uncert[j]*uncert[j]) );
+		}
+		loglikelihood += log10(likelihood);
+	}
+	return loglikelihood;
+}
+
 int main(int argc, char **argv){
 	uint32_t distrows, distcolumns;
 	uint32_t datarows, datacolumns;
 	uint32_t i, j, k;
 
 	//Check input arguments
-	if (argc != 5) {
-		fprintf(stderr,"USAGE: %s <nsims> <nsteps> <distribution.tsv> <zircondata.tsv>\n", argv[0]);
+	if (argc != 6) {
+		fprintf(stderr,"USAGE: %s <nsims> <nsteps> <stepfactor> <distribution.tsv> <zircondata.tsv>\n", argv[0]);
 		exit(1);
 	}
 
@@ -84,13 +100,16 @@ int main(int argc, char **argv){
 	const uint32_t nsims = (uint32_t)abs(atoi(argv[1]));
 	// Get number of steps for metropolis walker to take	
 	const uint32_t nsteps = (uint32_t)abs(atoi(argv[2]));
+	// sigma = stepfactor * last-step	
+	const double stepfactor = atof(argv[3]);
+
 
 	// Import data	
-	const double* dist = csvparseflat(argv[3],'\t', &distrows, &distcolumns);	
-	const double* data = csvparseflat(argv[4],'\t', &datarows, &datacolumns);
+	const double* dist = csvparseflat(argv[4],'\t', &distrows, &distcolumns);	
+	const double* data = csvparseflat(argv[5],'\t', &datarows, &datacolumns);
 	const double tmin_obs = minArray(data, datarows);
 	const double tmax_obs = maxArray(data, datarows);
-	const double dt = tmax_obs - tmin_obs;
+	const double dt = tmax_obs - tmin_obs + data[datarows*1+0] + data[datarows*1 + datarows-1];
 	double* synzirc = malloc(datarows * sizeof(double));
 	for (i=0; i<datarows; i++) {synzirc[i]=0;}
 
@@ -102,15 +121,18 @@ int main(int argc, char **argv){
 
 
 	double tmin, tmax, theta, tmin_proposed, tmax_proposed, theta_proposed;
-	double r, tmin_step=dt/10, tmax_step=dt/10;
+	double r, tmin_step=dt/(double)datarows, tmax_step=dt/(double)datarows;
 
 	tmin = tmin_obs;
 	tmax = tmax_obs;
 	tmin_proposed = tmin_obs;
 	tmax_proposed = tmax_obs;
-	theta = testAgeModel(&rng, dist, distrows, data, &data[datarows*1], synzirc, datarows, nsims, tmin_proposed, tmax_proposed);
+//	theta = testAgeModel(&rng, dist, distrows, data, &data[datarows*1], synzirc, datarows, nsims, tmin_proposed, tmax_proposed);
+	theta =  checkZirconLikelihood(dist, distrows, data, &data[datarows*1], datarows, tmin_proposed, tmax_proposed);
 
 	double p = 10;
+
+	int transitions=0;
 
 	for (i=0; i<nsteps; i++){
 		
@@ -118,7 +140,6 @@ int main(int argc, char **argv){
 		r = pcg32_random_r(&rng)/(double)UINT32_MAX;
 		if (r<0.5){
 			tmin_proposed = tmin + pcg_gaussian_ziggurat(&rng, tmin_step);
-			if (tmin_proposed > tmax)
 			tmax_proposed = tmax;
 		} else {
 			tmin_proposed = tmin;
@@ -132,18 +153,25 @@ int main(int argc, char **argv){
 		}
 
 		// Calculate log likelihood for new proposal
-		theta_proposed = testAgeModel(&rng, dist, distrows, data, &data[datarows*1], synzirc, datarows, nsims, tmin_proposed, tmax_proposed);
-
+//		theta_proposed = testAgeModel(&rng, dist, distrows, data, &data[datarows*1], synzirc, datarows, nsims, tmin_proposed, tmax_proposed);
+		theta_proposed =  checkZirconLikelihood(dist, distrows, data, &data[datarows*1], datarows, tmin_proposed, tmax_proposed);
 
 		// Decide to accept or reject the proposal
 		r = pcg32_random_r(&rng)/(double)UINT32_MAX;
 		if (r < pow(10,theta_proposed-theta)){// && tmin_proposed < tmax_proposed){ // don't let tmax go below tmin
+			if (tmin_proposed != tmin){
+				tmin_step = fabs(tmin_proposed-tmin)*stepfactor;
+			} 
+			if (tmax_proposed != tmax){
+				tmax_step = fabs(tmax_proposed-tmax)*stepfactor;
+			}
+
 			tmin = tmin_proposed;
 			tmax = tmax_proposed;
 			theta = theta_proposed;
 		}
 
-		printf("%f\t%f\n", tmin, tmax);
+		printf("%f\t%f\t%f\n", tmin, tmax, theta);
 	}
 
 return 0;
