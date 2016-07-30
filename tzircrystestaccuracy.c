@@ -31,8 +31,8 @@ void drawFromDistribution(pcg32_random_t* rng, const double* dist, const uint32_
 	double rx, ry, y;
  
 	for (int i=0; i<xrows; i++){
-		x[i] = NAN;
-		while (isnan(x[i])){
+		x[i] = -1;
+		while (x[i]==-1){
 			// Pick random x value
 			rx = pcg32_random_r(rng) / dist_xrandmax;
 			// Interpolate corresponding distribution value
@@ -67,7 +67,6 @@ void generateSyntheticZirconDataset(pcg32_random_t* rng, const double* dist, con
 double checkZirconLikelihood(const double* restrict dist, const uint32_t distrows, const double* restrict data, const double* restrict uncert, const uint32_t datarows, const double tmin, const double tmax){
 	double distx, likelihood, loglikelihood = 0;
 	const double dt = fabs(tmax-tmin);
-	const double sigma = nanmean(uncert,datarows);
 
 	for (int j=0; j<datarows; j++){
 		likelihood = 0;
@@ -77,7 +76,7 @@ double checkZirconLikelihood(const double* restrict dist, const uint32_t distrow
 		}
 		loglikelihood += log10(likelihood);
 	}
-	return loglikelihood - log10(dt*dt+sigma*sigma)/2.0;
+	return loglikelihood - log10(dt+nanmean(uncert,datarows)/1E6);
 }
 
 int findMetropolisEstimate(pcg32_random_t* rng, const double* dist, const uint32_t distrows, const double* data, const double* uncert, const uint32_t datarows, const uint32_t nsteps, double* const restrict mu, double* const restrict sigma){
@@ -203,7 +202,7 @@ int main(int argc, char **argv){
 //	double* synzirc = malloc(Nmax * sizeof(double));
 	double* data = malloc(Nmax * sizeof(double));
 	double* uncert = malloc(Nmax * sizeof(double));
-	double wx, wsigma, mswd; // For weighted mean
+	double wx, wsigma, mswd, minuncert; // For weighted mean
 	double tmin_metropolis_mswd, tmin_metropolis_est, tmin_obs, tmin_mswd_test; // Means
 	double tmin_metropolis_mswd_sigma, tmin_metropolis_est_sigma, tmin_obs_sigma, tmin_mswd_test_sigma; // Standard deviations
 
@@ -218,7 +217,13 @@ int main(int argc, char **argv){
 			generateSyntheticZirconDataset(&rng, dist, distrows, tmin_true, tmax_true, uncert, data, N);
 
 			findMetropolisEstimate(&rng, dist, distrows, data, uncert, N, nsteps, &tmin_metropolis_est, &tmin_metropolis_est_sigma);
-			
+
+			//Check that metroplis uncertainty hasn't fallen below theoretical minimum
+			minuncert = nanmean(uncert,N)/sqrt(N);
+			if (tmin_metropolis_est_sigma < minuncert){
+				tmin_metropolis_est_sigma = minuncert;
+			}
+
 			sort_doubles(data, N);
 			tmin_mswd_test = data[0];
 			tmin_mswd_test_sigma = absuncert;

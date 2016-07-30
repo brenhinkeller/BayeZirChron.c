@@ -73,7 +73,6 @@ double testAgeModel(pcg32_random_t* rng, const double* dist, const uint32_t dist
 double checkZirconLikelihood(const double* restrict dist, const uint32_t distrows, const double* restrict data, const double* restrict uncert, const uint32_t datarows, const double tmin, const double tmax){
 	double distx, likelihood, loglikelihood = 0;
 	const double dt = fabs(tmax-tmin);
-	const double sigma = nanmean(uncert,datarows);
 
 	for (int j=0; j<datarows; j++){
 		likelihood = 0;
@@ -83,7 +82,7 @@ double checkZirconLikelihood(const double* restrict dist, const uint32_t distrow
 		}
 		loglikelihood += log10(likelihood);
 	}
-	return loglikelihood - log10(dt*dt+sigma*sigma)/2.0;
+	return loglikelihood - log10(dt+nanmean(uncert,datarows)/1E6);
 }
 
 int main(int argc, char **argv){
