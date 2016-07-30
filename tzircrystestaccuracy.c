@@ -76,7 +76,7 @@ double checkZirconLikelihood(const double* restrict dist, const uint32_t distrow
 		}
 		loglikelihood += log10(likelihood);
 	}
-	return loglikelihood - log10(dt+nanmean(uncert,datarows)/1E6);
+	return loglikelihood - log10(dt+nanmean(uncert,datarows)/1E12);
 }
 
 int findMetropolisEstimate(pcg32_random_t* rng, const double* dist, const uint32_t distrows, const double* data, const double* uncert, const uint32_t datarows, const uint32_t nsteps, double* const restrict mu, double* const restrict sigma){
@@ -220,9 +220,10 @@ int main(int argc, char **argv){
 
 			//Check that metroplis uncertainty hasn't fallen below theoretical minimum
 			minuncert = nanmean(uncert,N)/sqrt(N);
-			if (tmin_metropolis_est_sigma < minuncert){
-				tmin_metropolis_est_sigma = minuncert;
-			}
+//			if (tmin_metropolis_est_sigma < minuncert){
+//				tmin_metropolis_est_sigma = minuncert;
+//			}
+			tmin_metropolis_est_sigma = sqrt(tmin_metropolis_est_sigma*tmin_metropolis_est_sigma + minuncert*minuncert);
 
 			sort_doubles(data, N);
 			tmin_mswd_test = data[0];

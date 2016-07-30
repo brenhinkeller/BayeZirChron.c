@@ -82,7 +82,7 @@ double checkZirconLikelihood(const double* restrict dist, const uint32_t distrow
 		}
 		loglikelihood += log10(likelihood);
 	}
-	return loglikelihood - log10(dt+nanmean(uncert,datarows)/1E6);
+	return loglikelihood - log10(dt+nanmean(uncert,datarows)/1E12);
 }
 
 
