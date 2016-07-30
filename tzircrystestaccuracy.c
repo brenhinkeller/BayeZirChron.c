@@ -67,16 +67,17 @@ void generateSyntheticZirconDataset(pcg32_random_t* rng, const double* dist, con
 double checkZirconLikelihood(const double* restrict dist, const uint32_t distrows, const double* restrict data, const double* restrict uncert, const uint32_t datarows, const double tmin, const double tmax){
 	double distx, likelihood, loglikelihood = 0;
 	const double dt = fabs(tmax-tmin);
+	const double sigma = nanmean(uncert,datarows);
 
 	for (int j=0; j<datarows; j++){
 		likelihood = 0;
 		for (int i=0; i<distrows; i++){
 			distx = tmax - dt*i/(distrows-1);
-			likelihood += dist[i] / (distrows * uncert[j] * sqrt(2*M_PI)) * exp( -(distx-data[j])*(distx-data[j]) / (2*uncert[j]*uncert[j]) );
+			likelihood += dist[i] / (distrows * uncert[j] * sqrt(2*M_PI))* exp( - (distx-data[j])*(distx-data[j]) / (2*uncert[j]*uncert[j]) );
 		}
 		loglikelihood += log10(likelihood);
 	}
-	return loglikelihood;
+	return loglikelihood - log10(dt*dt+sigma*sigma)/2.0;
 }
 
 int findMetropolisEstimate(pcg32_random_t* rng, const double* dist, const uint32_t distrows, const double* data, const double* uncert, const uint32_t datarows, const uint32_t nsteps, double* const restrict mu, double* const restrict sigma){
