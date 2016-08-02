@@ -71,19 +71,34 @@ double testAgeModel(pcg32_random_t* rng, const double* dist, const uint32_t dist
 
 
 double checkZirconLikelihood(const double* restrict dist, const uint32_t distrows, const double* restrict data, const double* restrict uncert, const uint32_t datarows, const double tmin, const double tmax){
-	double distx, likelihood, loglikelihood = 0;
+	double ix, wm, wsigma, mswd, distx, likelihood, loglikelihood = 0;
 	const double dt = fabs(tmax-tmin);
+	const double dist_xscale = (double)(distrows-1);
+	const double dist_yave = nanmean(dist, distrows);
 
 	for (int j=0; j<datarows; j++){
-		likelihood = 0;
-		for (int i=0; i<distrows; i++){
-			distx = tmax - dt*i/(distrows-1);
-			likelihood += dist[i] / (distrows * uncert[j] * sqrt(2*M_PI))* exp( - (distx-data[j])*(distx-data[j]) / (2*uncert[j]*uncert[j]) );
+		// If possible, prevent aliasing problems by interpolation
+		if ((uncert[j] < dt/dist_xscale) && data[j] > tmin && data[j] < tmax){
+			// Find (double) index
+			ix = (tmax - data[j])/dt*dist_xscale;
+			// Interpolate corresponding distribution value
+			likelihood = interp1i(dist,ix)/dt;
+		// Otherwise, sum contributions from Gaussians at each point in distribution
+		} else {
+			likelihood = 0;
+			for (int i=0; i<distrows; i++){
+				distx = tmax - dt*i/(distrows-1);
+				likelihood += dist[i] / (dist_yave * distrows * uncert[j] * sqrt(2*M_PI))* exp( - (distx-data[j])*(distx-data[j]) / (2*uncert[j]*uncert[j]) );
+			}
 		}
 		loglikelihood += log10(likelihood);
 	}
-	return loglikelihood - log10(dt+nanmean(uncert,datarows)/1E12);
+
+	wmean(data, uncert, datarows, &wm, &wsigma, &mswd);
+
+	return loglikelihood - log10(dt/wsigma)*sqrt(datarows)/(datarows-0.999); // *sqrt(datarows)/(mswd+0.01);// - log10(sqrt(dt*dt + nanmean(uncert, datarows)*nanmean(uncert,datarows))*(datarows-1)/datarows)*datarows;
 }
+
 
 
 int main(int argc, char **argv){
