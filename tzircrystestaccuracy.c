@@ -94,7 +94,7 @@ double checkZirconLikelihood(const double* restrict dist, const uint32_t distrow
 	}
 
 
-	wmean(data, uncert, datarows, &wm, &wsigma, &mswd);
+	awmean(data, uncert, datarows, &wm, &wsigma, &mswd);
 	if (datarows == 1){
 		Zf = 1;
 	} else if (mswd*sqrt(datarows)>1000){
@@ -105,7 +105,7 @@ double checkZirconLikelihood(const double* restrict dist, const uint32_t distrow
 		Zf = exp((f/2-1)*log(mswd) - f/2*(mswd-1)); // Height of MSWD distribution relative to height at mswd = 1;
 	}
 
-	return loglikelihood - log10(dt/wsigma) * Zf;
+	return loglikelihood - log10(fabs(tmin - wm)/wsigma)*(Zf + 2/datarows)/2 - log10(fabs(tmax - wm)/wsigma)*(Zf + 2/datarows)/2;
 }
 
 
