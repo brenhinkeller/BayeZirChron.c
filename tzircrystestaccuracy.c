@@ -64,8 +64,13 @@ void generateSyntheticZirconDataset(pcg32_random_t* rng, const double* dist, con
 }
 
 
+double stirling_lgamma(const double x){
+	// Stirling's Approximation for gamma function ( generalized log[(n-1)!] )
+	return (x - 0.5)*log(x) - x + 0.5*log(2*M_PI) + 1/(12*x) + 1/(360 * x * x * x); // + 1/(1260 * x * x * x * x * x) - ...
+}
+
 double checkZirconLikelihood(const double* restrict dist, const uint32_t distrows, const double* restrict data, const double* restrict uncert, const uint32_t datarows, const double tmin, const double tmax){
-	double ix, wm, wsigma, mswd, distx, likelihood, loglikelihood = 0;
+	double Zf, ix, wm, wsigma, mswd, distx, likelihood, loglikelihood = 0;
 	const double dt = fabs(tmax-tmin);
 	const double dist_xscale = (double)(distrows-1);
 	const double dist_yave = nanmean(dist, distrows);
@@ -82,15 +87,25 @@ double checkZirconLikelihood(const double* restrict dist, const uint32_t distrow
 			likelihood = 0;
 			for (int i=0; i<distrows; i++){
 				distx = tmax - dt*i/(distrows-1);
-				likelihood += dist[i] / (dist_yave * distrows * uncert[j] * sqrt(2*M_PI))* exp( - (distx-data[j])*(distx-data[j]) / (2*uncert[j]*uncert[j]) );
+				likelihood += dist[i] / (dist_yave * distrows * uncert[j] * sqrt(2*M_PI)) * exp( - (distx-data[j])*(distx-data[j]) / (2*uncert[j]*uncert[j]) );
 			}
 		}
 		loglikelihood += log10(likelihood);
 	}
 
-	wmean(data, uncert, datarows, &wm, &wsigma, &mswd);
 
-	return loglikelihood - log10(dt/wsigma)*sqrt(datarows)/(datarows-0.999); // *sqrt(datarows)/(mswd+0.01);// - log10(sqrt(dt*dt + nanmean(uncert, datarows)*nanmean(uncert,datarows))*(datarows-1)/datarows)*datarows;
+	wmean(data, uncert, datarows, &wm, &wsigma, &mswd);
+	if (datarows == 1){
+		Zf = 1;
+	} else if (mswd*sqrt(datarows)>1000){
+		Zf = 0;
+	} else {
+		const double f = (double)datarows-1;
+//		Zf = exp(f/2*log(f/2) - stirling_lgamma(f/2) + (f/2-1)*log(mswd) - f/2*mswd); // MSWD distribution from Wendt and Carl
+		Zf = exp((f/2-1)*log(mswd) - f/2*(mswd-1)); // Height of MSWD distribution relative to height at mswd = 1;
+	}
+
+	return loglikelihood - log10(dt/wsigma) * Zf;
 }
 
 
