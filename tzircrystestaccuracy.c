@@ -86,7 +86,7 @@ double checkZirconLikelihood(const double* restrict dist, const uint32_t distrow
 			ix = (tmax - data[j])/dt*dist_xscale;
 			// Interpolate corresponding distribution value
 			likelihood = interp1i(dist,ix)/dt;
-			// Otherwise, sum contributions from Gaussians at each point in distribution
+		// Otherwise, sum contributions from Gaussians at each point in distribution
 		} else {
 			likelihood = 0;
 			for (int i=0; i<distrows; i++){
@@ -99,23 +99,23 @@ double checkZirconLikelihood(const double* restrict dist, const uint32_t distrow
 
 
 	awmean(data, uncert, datarows, &wm, &wsigma, &mswd);
-	if (datarows == 1){
+	if (datarows == 1 || mswd<1){
 		Zf = 1;
 	} else if (mswd*sqrt(datarows)>1000){
 		Zf = 0;
 	} else {
 		const double f = (double)datarows-1;
-		//		Zf = exp(f/2*log(f/2) - stirling_lgamma(f/2) + (f/2-1)*log(mswd) - f/2*mswd); // MSWD distribution from Wendt and Carl
+		//Zf = exp(f/2*log(f/2) - stirling_lgamma(f/2) + (f/2-1)*log(mswd) - f/2*mswd); // Distribution of the MSWD for normally-distributed data, from Wendt and Carl 1991
 		Zf = exp((f/2-1)*log(mswd) - f/2*(mswd-1)); // Height of MSWD distribution relative to height at mswd = 1;
 	}
 
-	return loglikelihood - log10(fabs(tmin - wm)/wsigma)*(Zf + 2/datarows)/2 - log10(fabs(tmax - wm)/wsigma)*(Zf + 2/datarows)/2;
+	return loglikelihood - log10(fabs(tmin - wm)/wsigma)*Zf*(1+5/datarows) - log10(fabs(tmax - wm)/wsigma)*Zf*(1+5/datarows) - log10((fabs(tmin - data[0])+uncert[0])/uncert[0])*(1-Zf)*5/datarows - log10((fabs(tmax - data[datarows-1])+uncert[datarows-1])/uncert[datarows-1])*(1-Zf)*5/datarows;
 }
 
 
 
 int findMetropolisEstimate(pcg32_random_t* rng, const double* dist, const uint32_t distrows, const double* data, const double* uncert, const uint32_t datarows, const uint32_t nsteps, double* const restrict mu, double* const restrict sigma){
-	const uint32_t burnin = nsteps/10;
+	const uint32_t burnin = nsteps;
 	const double tmin_obs = minArray(data, datarows);
 	const double tmax_obs = maxArray(data, datarows);
 	const double dt = tmax_obs - tmin_obs + uncert[0] + uncert[datarows-1];
