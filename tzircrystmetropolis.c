@@ -69,9 +69,14 @@ double testAgeModel(pcg32_random_t* rng, const double* dist, const uint32_t dist
 }
 
 double stirling_lgamma(const double x){
-	// Stirling's Approximation for gamma function ( generalized log[(n-1)!] )
-	return (x - 0.5)*log(x) - x + 0.5*log(2*M_PI) + 1/(12*x) + 1/(360 * x * x * x); // + 1/(1260 * x * x * x * x * x) - ...
+	if (x<1){
+		return 0;
+	} else {
+		// Stirling's Approximation for gamma function ( generalized log[(n-1)!] )
+		return (x - 0.5)*log(x) - x + 0.5*log(2*M_PI) + 1/(12*x) + 1/(360 * x * x * x); // + 1/(1260 * x * x * x * x * x) - ...
+	}
 }
+
 
 double checkZirconLikelihood(const double* restrict dist, const uint32_t distrows, const double* restrict data, const double* restrict uncert, const uint32_t datarows, const double tmin, const double tmax){
 	double Zf, ix, wm, wsigma, mswd, distx, likelihood, loglikelihood = 0;
@@ -99,19 +104,18 @@ double checkZirconLikelihood(const double* restrict dist, const uint32_t distrow
 
 
 	awmean(data, uncert, datarows, &wm, &wsigma, &mswd);
-	if (datarows == 1){
+	if (datarows == 1 || mswd<1){
 		Zf = 1;
 	} else if (mswd*sqrt(datarows)>1000){
 		Zf = 0;
 	} else {
 		const double f = (double)datarows-1;
-//		Zf = exp(f/2*log(f/2) - stirling_lgamma(f/2) + (f/2-1)*log(mswd) - f/2*mswd); // MSWD distribution from Wendt and Carl
+		//Zf = exp(f/2*log(f/2) - stirling_lgamma(f/2) + (f/2-1)*log(mswd) - f/2*mswd); // Distribution of the MSWD for normally-distributed data, from Wendt and Carl 1991
 		Zf = exp((f/2-1)*log(mswd) - f/2*(mswd-1)); // Height of MSWD distribution relative to height at mswd = 1;
 	}
 
-	return loglikelihood - log10(fabs(tmin - wm)/wsigma)*(Zf + 2/datarows)/2 - log10(fabs(tmax - wm)/wsigma)*(Zf + 2/datarows)/2;
+	return loglikelihood - log10(fabs(tmin - wm)/wsigma)*Zf*(1+5/datarows) - log10(fabs(tmax - wm)/wsigma)*Zf*(1+5/datarows) - log10((fabs(tmin - data[0])+uncert[0])/uncert[0])*(1-Zf)*5/datarows - log10((fabs(tmax - data[datarows-1])+uncert[datarows-1])/uncert[datarows-1])*(1-Zf)*5/datarows;
 }
-
 
 
 int main(int argc, char **argv){
@@ -156,6 +160,23 @@ int main(int argc, char **argv){
 	tmax = tmax_obs;
 	tmin_proposed = tmin_obs;
 	tmax_proposed = tmax_obs;
+
+//	// CDF of the distribution of the MSWD from Wendt and Carl
+//	if (datarows % 2){
+//		Zf = 0;
+//		for (int v=0; v<(datarows-1)/2; v++){
+//			Zf += pow(f/2,v) / exp(stirling_lgamma(v)) * pow(mswd,v)
+//		}
+//		Zf = Zf * exp(-f*mswd/2);
+//	} else {
+//		Zf = 0;
+//		for (int v=1; v<datarows/2; v++){
+//			Zf += pow(f,v-1) * pow(2,v) * exp(stirling_lgamma(v)-stirling_lgamma(2*v)) * pow(mswd,v-0.5)
+//		}
+//		Zf = 1 - 2*(sqrt(erf(f*mswd)) - sqrt(f/2*M_PI)*exp(-f*mswd/2)*Zf)
+//	}
+
+
 //	theta = testAgeModel(&rng, dist, distrows, data, &data[datarows*1], synzirc, datarows, nsims, tmin_proposed, tmax_proposed);
 	theta =  checkZirconLikelihood(dist, distrows, data, &data[datarows*1], datarows, tmin_proposed, tmax_proposed);
 

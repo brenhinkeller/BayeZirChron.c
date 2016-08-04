@@ -65,8 +65,12 @@ void generateSyntheticZirconDataset(pcg32_random_t* rng, const double* dist, con
 
 
 double stirling_lgamma(const double x){
-	// Stirling's Approximation for gamma function ( generalized log[(n-1)!] )
-	return (x - 0.5)*log(x) - x + 0.5*log(2*M_PI) + 1/(12*x) + 1/(360 * x * x * x); // + 1/(1260 * x * x * x * x * x) - ...
+	if (x<1){
+		return 0;
+	} else {
+		// Stirling's Approximation for gamma function ( generalized log[(n-1)!] )
+		return (x - 0.5)*log(x) - x + 0.5*log(2*M_PI) + 1/(12*x) + 1/(360 * x * x * x); // + 1/(1260 * x * x * x * x * x) - ...
+	}
 }
 
 double checkZirconLikelihood(const double* restrict dist, const uint32_t distrows, const double* restrict data, const double* restrict uncert, const uint32_t datarows, const double tmin, const double tmax){
@@ -82,7 +86,7 @@ double checkZirconLikelihood(const double* restrict dist, const uint32_t distrow
 			ix = (tmax - data[j])/dt*dist_xscale;
 			// Interpolate corresponding distribution value
 			likelihood = interp1i(dist,ix)/dt;
-		// Otherwise, sum contributions from Gaussians at each point in distribution
+			// Otherwise, sum contributions from Gaussians at each point in distribution
 		} else {
 			likelihood = 0;
 			for (int i=0; i<distrows; i++){
@@ -101,7 +105,7 @@ double checkZirconLikelihood(const double* restrict dist, const uint32_t distrow
 		Zf = 0;
 	} else {
 		const double f = (double)datarows-1;
-//		Zf = exp(f/2*log(f/2) - stirling_lgamma(f/2) + (f/2-1)*log(mswd) - f/2*mswd); // MSWD distribution from Wendt and Carl
+		//		Zf = exp(f/2*log(f/2) - stirling_lgamma(f/2) + (f/2-1)*log(mswd) - f/2*mswd); // MSWD distribution from Wendt and Carl
 		Zf = exp((f/2-1)*log(mswd) - f/2*(mswd-1)); // Height of MSWD distribution relative to height at mswd = 1;
 	}
 
