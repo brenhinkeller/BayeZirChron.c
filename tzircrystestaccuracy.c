@@ -97,10 +97,10 @@ double checkZirconLikelihood(const double* restrict dist, const uint32_t distrow
 		loglikelihood += log10(likelihood);
 	}
 
-
 	awmean(data, uncert, datarows, &wm, &wsigma, &mswd);
 	if (datarows == 1 || mswd<1){
 		Zf = 1;
+		mswd = 1;
 	} else if (mswd*sqrt(datarows)>1000){
 		Zf = 0;
 	} else {
@@ -109,13 +109,13 @@ double checkZirconLikelihood(const double* restrict dist, const uint32_t distrow
 		Zf = exp((f/2-1)*log(mswd) - f/2*(mswd-1)); // Height of MSWD distribution relative to height at mswd = 1;
 	}
 
-	return loglikelihood - log10(fabs(tmin - wm)/wsigma)*Zf*(1+5/datarows) - log10(fabs(tmax - wm)/wsigma)*Zf*(1+5/datarows) - log10((fabs(tmin - data[0])+uncert[0])/uncert[0])*(1-Zf)*5/datarows - log10((fabs(tmax - data[datarows-1])+uncert[datarows-1])/uncert[datarows-1])*(1-Zf)*5/datarows;
+	return loglikelihood  - ( log10((fabs(tmin - wm)+wsigma)/wsigma)*Zf + log10((fabs(tmax - wm)+wsigma)/wsigma)*Zf + log10((fabs(tmin - data[0])+uncert[0])/uncert[0])*(1-Zf) + log10((fabs(tmax - data[datarows-1])+uncert[datarows-1])/uncert[datarows-1])*(1-Zf) ) * (2/log10(1+datarows)); 
 }
 
 
 
 int findMetropolisEstimate(pcg32_random_t* rng, const double* dist, const uint32_t distrows, const double* data, const double* uncert, const uint32_t datarows, const uint32_t nsteps, double* const restrict mu, double* const restrict sigma){
-	const uint32_t burnin = nsteps;
+	const uint32_t burnin = nsteps/2;
 	const double tmin_obs = minArray(data, datarows);
 	const double tmax_obs = maxArray(data, datarows);
 	const double dt = tmax_obs - tmin_obs + uncert[0] + uncert[datarows-1];
@@ -252,13 +252,14 @@ int main(int argc, char **argv){
 			generateSyntheticZirconDataset(&rng, dist, distrows, tmin_true, tmax_true, uncert, data, N);
 
 			findMetropolisEstimate(&rng, dist, distrows, data, uncert, N, nsteps, &tmin_metropolis_est, &tmin_metropolis_est_sigma);
+			tmin_metropolis_est_sigma = 1.253*tmin_metropolis_est_sigma;//Convert from mean absolute deviation to standard deviation
 
 			//Check that metroplis uncertainty hasn't fallen below theoretical minimum
 			minuncert = nanmean(uncert,N)/sqrt(N);
-//			if (tmin_metropolis_est_sigma < minuncert){
-//				tmin_metropolis_est_sigma = minuncert;
-//			}
-			tmin_metropolis_est_sigma = sqrt(tmin_metropolis_est_sigma*tmin_metropolis_est_sigma + minuncert*minuncert);
+			if (tmin_metropolis_est_sigma < minuncert){
+				tmin_metropolis_est_sigma = minuncert;
+			}
+			//sqrt(tmin_metropolis_est_sigma*tmin_metropolis_est_sigma + minuncert*minuncert);
 
 			sort_doubles(data, N);
 			tmin_mswd_test = data[0];
@@ -287,7 +288,7 @@ int main(int argc, char **argv){
 			}
 
 
-			printf("%i\t%g\t%g\t%g\t%g\t%g\t%g\t%g\t%g\t%g\t%g\t%g\n", N, mswd, fabs(wx-tmin_true)/absuncert, fabs(tmin_mswd_test-tmin_true)/absuncert, fabs(tmin_obs-tmin_true)/absuncert, fabs(tmin_metropolis_est-tmin_true)/absuncert, fabs(tmin_metropolis_mswd-tmin_true)/absuncert, fabs(wx-tmin_true)/wsigma, fabs(tmin_mswd_test-tmin_true)/tmin_mswd_test_sigma, fabs(tmin_obs-tmin_true)/tmin_obs_sigma, fabs(tmin_metropolis_est-tmin_true)/tmin_metropolis_est_sigma, fabs(tmin_metropolis_mswd-tmin_true)/tmin_metropolis_mswd_sigma);
+			printf("%i\t%g\t%g\t%g\t%g\t%g\t%g\t%g\t%g\t%g\t%g\t%g\n", N, mswd, (wx-tmin_true)/absuncert, (tmin_mswd_test-tmin_true)/absuncert, (tmin_obs-tmin_true)/absuncert, (tmin_metropolis_est-tmin_true)/absuncert, (tmin_metropolis_mswd-tmin_true)/absuncert, (wx-tmin_true)/wsigma*1.253, (tmin_mswd_test-tmin_true)/tmin_mswd_test_sigma*1.253, (tmin_obs-tmin_true)/tmin_obs_sigma*1.253, (tmin_metropolis_est-tmin_true)/tmin_metropolis_est_sigma*1.253, (tmin_metropolis_mswd-tmin_true)/tmin_metropolis_mswd_sigma)*1.253;
 		}
 	}
 	

@@ -114,7 +114,7 @@ double checkZirconLikelihood(const double* restrict dist, const uint32_t distrow
 		Zf = exp((f/2-1)*log(mswd) - f/2*(mswd-1)); // Height of MSWD distribution relative to height at mswd = 1;
 	}
 
-	return loglikelihood - log10(fabs(tmin - wm)/wsigma)*Zf*(1+5/datarows) - log10(fabs(tmax - wm)/wsigma)*Zf*(1+5/datarows) - log10((fabs(tmin - data[0])+uncert[0])/uncert[0])*(1-Zf)*5/datarows - log10((fabs(tmax - data[datarows-1])+uncert[datarows-1])/uncert[datarows-1])*(1-Zf)*5/datarows;
+	return loglikelihood  - ( log10((fabs(tmin - wm)+wsigma)/wsigma)*Zf + log10((fabs(tmax - wm)+wsigma)/wsigma)*Zf + log10((fabs(tmin - data[0])+uncert[0])/uncert[0])*(1-Zf) + log10((fabs(tmax - data[datarows-1])+uncert[datarows-1])/uncert[datarows-1])*(1-Zf) ) * (2/log10(1+datarows)); 
 }
 
 
