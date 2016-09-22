@@ -687,7 +687,7 @@ int standardize(double* restrict x, const uint32_t n){
 // Calculate a weigted mean, including MSWD.
 int wmean(const double* x, const double* sigma, const uint32_t n, double* wx, double* wsigma, double* mswd){
 	uint32_t i;
-	double s0 = 0, s1 = 0,  s2 = 0, s3 = 0;
+	double s1 = 0, s2 = 0, s3 = 0;
 
 	if (n==1){
 		*wx = x[0];
@@ -695,7 +695,6 @@ int wmean(const double* x, const double* sigma, const uint32_t n, double* wx, do
 		*wsigma = sigma[0];
 	} else {
 		for(i=0; i<n; i++){
-			s0 += 1 / sigma[i];
 			s1 += x[i] / (sigma[i]*sigma[i]);
 			s2 += 1 / (sigma[i]*sigma[i]);
 		}
@@ -705,15 +704,15 @@ int wmean(const double* x, const double* sigma, const uint32_t n, double* wx, do
 			s3 += (x[i] - *wx)*(x[i] - *wx) / (sigma[i]*sigma[i]);
 		}
 		*mswd = s3 / (n-1);
-		*wsigma = sqrt(*mswd/s0);
+		*wsigma = sqrt(*mswd/s2);
 	}
 	return 0;
 }
 
-// Calculate a weigted mean, including MSWD, assuming experimental uncertainties are not overestimated
+// Calculate a weigted mean, including MSWD, but without MSWD correction to uncertainty
 int awmean(const double* x, const double* sigma, const uint32_t n, double* wx, double* wsigma, double* mswd){
 	uint32_t i;
-	double s0 = 0, s1 = 0,  s2 = 0, s3 = 0;
+	double s1 = 0,  s2 = 0, s3 = 0;
 
 	if (n==1){
 		*wx = x[0];
@@ -721,7 +720,6 @@ int awmean(const double* x, const double* sigma, const uint32_t n, double* wx, d
 		*wsigma = sigma[0];
 	} else {
 		for(i=0; i<n; i++){
-			s0 += 1 / sigma[i];
 			s1 += x[i] / (sigma[i]*sigma[i]);
 			s2 += 1 / (sigma[i]*sigma[i]);
 		}
@@ -731,16 +729,8 @@ int awmean(const double* x, const double* sigma, const uint32_t n, double* wx, d
 			s3 += (x[i] - *wx)*(x[i] - *wx) / (sigma[i]*sigma[i]);
 		}
 		*mswd = s3 / (n-1);
-		*wsigma = sqrt(*mswd/s0);
+		*wsigma = sqrt(1.0/s2);
 	}
-	
-	// Assume experimintal uncertainties are not overestimated:
-	// Do not allow uncertainty to fall below sigma/sqrt(n)
-	double maxprec = nanmean(sigma, n) / (double)sqrt(n);
-	if (*wsigma<maxprec) {
-		*wsigma = maxprec;
-	}
-
 	return 0;
 }
 
