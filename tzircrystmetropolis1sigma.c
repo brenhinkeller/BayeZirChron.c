@@ -1,5 +1,5 @@
 /******************************************************************************
- * FILE: tzircrystmetroplis.c
+ * FILE: tzircrystmetroplis1sigma.c
  * DESCRIPTION: Runs metropolis walker to find optima of zircon age distribution
  * AUTHOR: C. Brenhin Keller
  ******************************************************************************/
@@ -14,7 +14,9 @@
 #include "gauss.h"
 
 
+
 void drawFromDistribution(pcg32_random_t* rng, const double* dist, const uint32_t distrows, double* x, const uint32_t xrows){
+	// Draw N = xrows random numbers from the distribution 'dist'
 	const double dist_yrandmax = UINT32_MAX / maxArray(dist,distrows);
 	const double dist_xscale = (double)(distrows-1);
 	const double dist_xrandmax = UINT32_MAX / dist_xscale;
@@ -36,49 +38,8 @@ void drawFromDistribution(pcg32_random_t* rng, const double* dist, const uint32_
 	}
 }
 
-void generateSyntheticZirconDataset(pcg32_random_t* rng, const double* dist, const uint32_t distrows, const double tmin, const double tmax, const double* uncert, double* synzirc, const uint32_t datarows){
-	double dt = fabs(tmax - tmin);
-	double r;
-
-	drawFromDistribution(rng, dist, distrows, synzirc, datarows);
-	sort_doubles_descending(synzirc, datarows);
-	for(int i=0; i<datarows; i++){
-		r = pcg_gaussian_ziggurat(rng, uncert[i]);
-		synzirc[i] = (1-synzirc[i]) * dt + tmin + r;
-
-	}
-}
-
-double compareZirconPopulations(const double* data, const double* uncert, const double* synzirc, const uint32_t rows){
-	double loglikelihood = 0;
-	for (int i=0; i<rows; i++){
-		loglikelihood += log10( 1 / (uncert[i] * sqrt(2*M_PI)) * exp( - (synzirc[i]-data[i])*(synzirc[i]-data[i]) / (2*uncert[i]*uncert[i]) ));
-	}
-	return loglikelihood / (double)rows;
-}
-
-
-double testAgeModel(pcg32_random_t* rng, const double* dist, const uint32_t distrows, const double* data, const double* uncert, double* synzirc, const uint32_t datarows, const uint32_t nsims, const double tmin, const double tmax){
-	double loglikelihood = 0;
-	for (int i=0; i<nsims; i++){
-		generateSyntheticZirconDataset(rng, dist, distrows, tmin, tmax, uncert, synzirc, datarows);
-		sort_doubles(synzirc, datarows);
-		loglikelihood += compareZirconPopulations(data, uncert, synzirc, datarows);
-	}
-	return loglikelihood / (double)nsims;
-}
-
-double stirling_lgamma(const double x){
-	if (x<1){
-		return 0;
-	} else {
-		// Stirling's Approximation for gamma function ( generalized log[(n-1)!] )
-		return (x - 0.5)*log(x) - x + 0.5*log(2*M_PI) + 1/(12*x) + 1/(360 * x * x * x); // + 1/(1260 * x * x * x * x * x) - ...
-	}
-}
-
-
 double checkZirconLikelihood(const double* restrict dist, const uint32_t distrows, const double* restrict data, const double* restrict uncert, const uint32_t datarows, const double tmin, const double tmax){
+	// Return the log-likelihood of drawing the dataset 'data' from the distribution 'dist'
 	double Zf, ix, wm, wsigma, mswd, distx, likelihood, loglikelihood = 0;
 	const double dt = fabs(tmax-tmin);
 	const double dist_xscale = (double)(distrows-1);
@@ -102,7 +63,7 @@ double checkZirconLikelihood(const double* restrict dist, const uint32_t distrow
 		loglikelihood += log10(likelihood);
 	}
 
-
+	// Calculate a weighted mean and examine our MSWD
 	awmean(data, uncert, datarows, &wm, &wsigma, &mswd);
 	if (datarows == 1 || mswd<1){
 		Zf = 1;
@@ -110,15 +71,24 @@ double checkZirconLikelihood(const double* restrict dist, const uint32_t distrow
 		Zf = 0;
 	} else {
 		const double f = (double)datarows-1;
-		//Zf = exp(f/2*log(f/2) - stirling_lgamma(f/2) + (f/2-1)*log(mswd) - f/2*mswd); // Distribution of the MSWD for normally-distributed data, from Wendt and Carl 1991
 		Zf = exp((f/2-1)*log(mswd) - f/2*(mswd-1)); // Height of MSWD distribution relative to height at mswd = 1;
 	}
 
+	// At low N (low sample numbers), favor the weighted mean interpretation at high Zf
+	// (MSWD close to 1) and the youngest-zircon interpretation at low Zf (MSWD far from one).
+	// This is helpful to for preventing instability at low N, with the funcional form
+	// used here derived from training against synthetic datasets.
 	return loglikelihood  - ( log10((fabs(tmin - wm)+wsigma)/wsigma)*Zf + log10((fabs(tmax - wm)+wsigma)/wsigma)*Zf + log10((fabs(tmin - data[0])+uncert[0])/uncert[0])*(1-Zf) + log10((fabs(tmax - data[datarows-1])+uncert[datarows-1])/uncert[datarows-1])*(1-Zf) ) * (2/log10(1+datarows));
 }
 
 
 int main(int argc, char **argv){
+	// Run a Metropolis sampler to quantify zircon saturation and eruption ages
+	// Invoke from command line as: tzircrystmetroplis1sigma  <nsteps> <distribution.tsv> <zircondata.tsv>
+	// Where 'nsteps; is the number of steps in the Markov chain, 'distribution.tsv' is a column vector containing
+	// a prior probability distribution for zircon crystallisation, and 'zircondata.tsv' is the raw zircon
+	// age spectrum and 1-sigma uncertainty in comma- or tab-separated columns
+
 	uint32_t distrows, distcolumns;
 	uint32_t datarows, datacolumns;
 	uint32_t i, j, k;
@@ -129,8 +99,7 @@ int main(int argc, char **argv){
 		exit(1);
 	}
 
-//	// Get number of simulations per MPI task from command-line argument
-//	const uint32_t nsims = (uint32_t)abs(atoi(argv[1]));
+
 	// Get number of steps for metropolis walker to take
 	const uint32_t nsteps = (uint32_t)abs(atoi(argv[1]));
 	// sigma = stepfactor * last-step
@@ -145,16 +114,14 @@ int main(int argc, char **argv){
 		data = csvparseflat(argv[3],',', &datarows, &datacolumns);
 	}
 
-	// for (i=0; i<datarows; i++){
-	// 	data[datarows*1+i]=data[datarows*1+i]/2; // Convert from 2-sigma to 1-sigma uncertainties
-	// }
+//	for (i=0; i<datarows; i++){
+//		data[datarows*1+i]=data[datarows*1+i]/2; // Convert from 2-sigma to 1-sigma uncertainties
+//	}
 	const double tmin_obs = minArray(data, datarows);
 	const double tmax_obs = maxArray(data, datarows);
 	const double dt = tmax_obs - tmin_obs + data[datarows*1+0] + data[datarows*1 + datarows-1];
 
-//	double* synzirc = malloc(datarows * sizeof(double));
-//	for (i=0; i<datarows; i++) {synzirc[i]=0;}
-
+	// Print statements for debugging, if necessary
 //	printf("distribution size: %i, %i\n", distrows, distcolumns);
 //	printf("data size: %i, %i\n", datarows, datacolumns);
 
@@ -170,13 +137,13 @@ int main(int argc, char **argv){
 	tmin_proposed = tmin_obs;
 	tmax_proposed = tmax_obs;
 
-//	theta = testAgeModel(&rng, dist, distrows, data, &data[datarows*1], synzirc, datarows, nsims, tmin_proposed, tmax_proposed);
 	theta =  checkZirconLikelihood(dist, distrows, data, &data[datarows*1], datarows, tmin_proposed, tmax_proposed);
 
 	double p = 10;
 
 	int transitions=0;
 
+	// Step through each of the N steps in the Markov chain
 	for (i=0; i<nsteps; i++){
 
 		// Uniformly adjust either the upper or lower bound age
@@ -196,7 +163,6 @@ int main(int argc, char **argv){
 		}
 
 		// Calculate log likelihood for new proposal
-//		theta_proposed = testAgeModel(&rng, dist, distrows, data, &data[datarows*1], synzirc, datarows, nsims, tmin_proposed, tmax_proposed);
 		theta_proposed =  checkZirconLikelihood(dist, distrows, data, &data[datarows*1], datarows, tmin_proposed, tmax_proposed);
 
 		// Decide to accept or reject the proposal
