@@ -2,7 +2,7 @@ v = 46;
 cd(['~/Desktop/zircon cryst timescales/v' num2str(v) ' results/']);
 
 % dts = [0.01 0.1 0.5 1 2 5 10 20 50 100];
-dts = [0.01 0.5 1 2 10];
+dts = [0.01 0.5 1 2 5 10];
 
 % dts = [0.01];
 

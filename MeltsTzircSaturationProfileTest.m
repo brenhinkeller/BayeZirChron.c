@@ -5,10 +5,10 @@ if ~exist('dist','var'); load volcaniczircondistribution.mat; end;
 
 %% draw from new PDF
 
-nzircs = 1000;
-dt_sigma =0.1;
+nzircs = 10;
+dt_sigma = 10;
 
-agemax = 100.1;
+agemax = 101;
 agemin = 100;
 agerange = agemax - agemin;
 
@@ -29,6 +29,7 @@ plot([0,nzircs+1],[agemin agemin],'b');
 plot([0,nzircs+1],[agemax agemax],'b');
 errorbar(observedages,2*observeduncert,'.r')
 
+%%
 [wm, wsigma, mswd]=wmean(observedages,observeduncert)
 %Zf(nzircs-1,mswd)
 Pf = Zf(nzircs-1,mswd)./Zf(nzircs-1,1)
@@ -37,7 +38,8 @@ Pf = Zf(nzircs-1,mswd)./Zf(nzircs-1,1)
 % Export and run metropolis sampler
 
 exportmatrix(sorted,'zircondata.tsv','\t');
-system('./tzircrystmetropolis 1000 100000 2.9 MeltsTZircDistribtuion.csv zircondata.tsv > metropolisdata.tsv');
+% system('./tzircrystmetropolis 100000 MeltsTZircDistribtuion.tsv zircondata.tsv > metropolisdata.tsv');
+system('./tzircrystmetropolis 100000 VolcanicZirconDistribution.tsv zircondata.tsv > metropolisdata.tsv');
 load metropolisdata.tsv
 
 % figure; plot(metropolisdata(:,3))
@@ -53,7 +55,7 @@ err_yzerr = (nanmean(metropolisdata(10000:end,1))-agemin)/(min(observedages)-age
 
 exportmatrix(sorted,'zircondata.tsv','\t');
 
-system('./tzircrystimage 200 MeltsTZircDistribtuion.csv zircondata.tsv > imagedata.tsv');
+system('./tzircrystimage 200 MeltsTZircDistribtuion.tsv zircondata.tsv > imagedata.tsv');
 
 
 load imagedata.tsv
@@ -62,15 +64,23 @@ im = imagedata(2:end, 2:end);
 x = imagedata(1,2:end);
 y = imagedata(2:end,1);
 
+% figure; imagesc(x,y,im)
+im = im -max(max(im));
+im(im<-120)=-120;
 figure; imagesc(x,y,im)
+load viridis
+colormap([0.3,0.3,0.3; viridis])
+caxis([-121 0]);
+c=colorbar;% ('Ticks',-140:20:-20,'TickLabels',{'-120','-100','-80','-60','-40','-20','0'});
+c.Label.String = 'Relative log likelihood';
 
 hold on; plot(agemax,agemin,'+k','MarkerSize',10,'LineWidth',1.5)
 % hold on; plot(max(observedages),min(observedages),'.k','MarkerSize',10)
-hold on; plot(wmean(observedages,observeduncert),wmean(observedages,observeduncert),'+m','MarkerSize',10,'LineWidth',1.5)
+hold on; plot(wmean(observedages,observeduncert),wmean(observedages,observeduncert),'+r','MarkerSize',10,'LineWidth',1.5)
 legend('True answer','Weighted  mean')
-xlabel('Beginning of zircon crystallization')
-ylabel('End of zircon crystallization')
-title(['N = ' num2str(nzircs)]);
+xlabel('Beginning of zircon crystallization (time)')
+ylabel('End of zircon crystallization (time)')
+title(['N = ' num2str(nzircs) ', \Deltat/\sigma = ' num2str(dt_sigma)]);
 formatfigure 
 
 %% Check optimal step factor
@@ -80,7 +90,7 @@ transition_probability=NaN(size(stepfactor));
 pool=gcp; %Start a parellel processing pool if there isn't one already
 parfor i=1:length(stepfactor);
     transition_probability(i) = getTransitionProbability(stepfactor(i))
-%     system(['./tzircrystmetropolis 100 100000 ' num2str(stepfactor(i)) ' MeltsTZircDistribtuion.csv zircondata.tsv > metropolisdata.tsv']);
+%     system(['./tzircrystmetropolis 100 100000 ' num2str(stepfactor(i)) ' MeltsTZircDistribtuion.tsv zircondata.tsv > metropolisdata.tsv']);
 %     load metropolisdata.tsv
 %     transition_probability(i) = sum(diff(metropolisdata(:,3))~=0)./length(metropolisdata(:,3));
 end

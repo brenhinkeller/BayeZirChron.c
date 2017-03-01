@@ -17,7 +17,7 @@ observeduncert = sorted(:,2);
 workdir=['out' num2str(i)];
 system(['mkdir -p ' workdir]);
 exportmatrix(sorted,[workdir '/zircondata.tsv'],'\t');
-system(['cd ' workdir '; ../tzircrystmetropolis 100 100000 2.9 ../MeltsTZircDistribtuion.csv ./zircondata.tsv > metropolisdata.tsv']);
+system(['cd ' workdir '; ../tzircrystmetropolis 100000 ../MeltsTZircDistribtuion.tsv ./zircondata.tsv > metropolisdata.tsv']);
 load([workdir '/metropolisdata.tsv']);
 
 [wm, ~, ~]=wmean(observedages,observeduncert);
