@@ -138,16 +138,16 @@ int main(int argc, char **argv){
 
 
 	// Import data -- try both comma and tab-delimited files
-	const double* dist = csvparseflat(argv[2],'\t', &distrows, &distcolumns); // distribution has only one column - delimiter doesn't matter
+	double* dist = csvparseflat(argv[2],'\t', &distrows, &distcolumns); // distribution has only one column, delimiter doesn't matter
 	double* data = csvparseflat(argv[3],'\t', &datarows, &datacolumns);
 	if (datacolumns<2){
 		free(data);
 		data = csvparseflat(argv[3],',', &datarows, &datacolumns);
 	}
 
-	for (i=0; i<datarows; i++){
-		data[datarows*1+i]=data[datarows*1+i]/2; // Convert from 2-sigma to 1-sigma uncertainties
-	}
+	// for (i=0; i<datarows; i++){
+	// 	data[datarows*1+i]=data[datarows*1+i]/2; // Convert from 2-sigma to 1-sigma uncertainties
+	// }
 	const double tmin_obs = minArray(data, datarows);
 	const double tmax_obs = maxArray(data, datarows);
 	const double dt = tmax_obs - tmin_obs + data[datarows*1+0] + data[datarows*1 + datarows-1];

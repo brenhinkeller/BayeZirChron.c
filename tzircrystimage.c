@@ -17,10 +17,10 @@
 
 void drawFromDistribution(pcg32_random_t* rng, const double* dist, const uint32_t distrows, double* x, const uint32_t xrows){
 	const double dist_yrandmax = UINT32_MAX / maxArray(dist,distrows);
-	const double dist_xscale = (double)(distrows-1); 
+	const double dist_xscale = (double)(distrows-1);
 	const double dist_xrandmax = UINT32_MAX / dist_xscale;
 	double rx, ry, y;
- 
+
 	for (int i=0; i<xrows; i++){
 		x[i] = -1;
 		while (x[i] == -1){
@@ -116,7 +116,7 @@ double checkZirconLikelihood(const double* restrict dist, const uint32_t distrow
 		Zf = exp((f/2-1)*log(mswd) - f/2*(mswd-1)); // Height of MSWD distribution relative to height at mswd = 1;
 	}
 
-	return loglikelihood  - ( log10((fabs(tmin - wm)+wsigma)/wsigma)*Zf + log10((fabs(tmax - wm)+wsigma)/wsigma)*Zf + log10((fabs(tmin - data[0])+uncert[0])/uncert[0])*(1-Zf) + log10((fabs(tmax - data[datarows-1])+uncert[datarows-1])/uncert[datarows-1])*(1-Zf) ) * (2/log10(1+datarows)); 
+	return loglikelihood  - ( log10((fabs(tmin - wm)+wsigma)/wsigma)*Zf + log10((fabs(tmax - wm)+wsigma)/wsigma)*Zf + log10((fabs(tmin - data[0])+uncert[0])/uncert[0])*(1-Zf) + log10((fabs(tmax - data[datarows-1])+uncert[datarows-1])/uncert[datarows-1])*(1-Zf) ) * (2/log10(1+datarows));
 }
 
 
@@ -134,9 +134,13 @@ int main(int argc, char **argv){
 	// Get number of simulations per MPI task from command-line argument
 	const uint32_t nsims = (uint32_t)atoi(argv[1]);
 
-	// Import data	
-	const double* dist = csvparseflat(argv[2],'\t', &distrows, &distcolumns);	
-	const double* data = csvparseflat(argv[3],'\t', &datarows, &datacolumns);
+	// Import data -- try both tab and comma-delimited input files
+	const double* dist = csvparseflat(argv[2],'\t', &distrows, &distcolumns); // distribution has only one column - delimiter doesn't matter
+	double* data = csvparseflat(argv[3],'\t', &datarows, &datacolumns);
+	if (datacolumns<2){
+		free(data);
+		data = csvparseflat(argv[3],',', &datarows, &datacolumns);
+	}
 	const double tmin = minArray(data, datarows);
 	const double tmax = maxArray(data, datarows);
 	const double dt = tmax - tmin;
