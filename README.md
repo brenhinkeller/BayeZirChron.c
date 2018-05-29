@@ -2,7 +2,7 @@
 
 C version of Bayesian zircon eruption age estimation code
 
-#### Installation from command line
+## Installation from command line
 
 Installation from the command line requires a working C compiler. The default [makefile](src/Makefile) assumes [gcc](https://gcc.gnu.org) (or an alias) is available. 
 On linux/unix/bsd this is likely already true; on Mac OS the necessary tools for compiling C source can be installed by typing `xcode-select --install` at the command line.
@@ -29,3 +29,24 @@ or
 mpicc -std=c11 -O3 -o tzircrystestaccuracy tzircrystestaccuracy.c
 ```
 Compiling and running this parallel version additionally requires a working installation of MPI (either [Open MPI](https://www.open-mpi.org) or [MPICH](https://www.mpich.org)) A sample batchfile is provided in the example folder: [runTest.pbs](examples/synthetic%20dataset%20tests/runTest.pbs)
+
+## Usage
+
+A range of [examples](examples/), including the application Bayesian zircon eruption age estimation code to literature datasets, is provided. A Matlab script to run all literature examples is provided in [examples/literature dataset tests/RunLiteratureExamples.m](examples/literature%20dataset%20tests/RunLiteratureExamples.m)
+
+The results of synthetic dataset tests, which compare traditional weighted-mean and youngest-zircon interpretations to Bayesian eruption age estimates (using several different crystallization distributions)  are provided in [examples/synthetic%20dataset%20tests/](examples/synthetic%20dataset%20tests/). Figures can be re-plotted using a Matlab script [tzircrystestaccuracyPlots.m](examples/synthetic%20dataset%20tests/tzircrystestaccuracyPlots.m).
+
+To reproduce the datafiles provided in this folder, compile the parallel code tzircrystestaccuracy.c as described above (using mpicc), and run using
+
+```bash
+mpiexec -np <number-of-tasks> ./tzircrystestaccuracy  <sims-per-task> <nsteps> <dt/sigma>  Distribution.tsv  > results.tsv
+```
+where <number-of-tasks> is the number of MPI tasks to run (typically you want this to be equal to the number of CPU cores or hardware threads you are running on),  <sims-per-task> is the number of simulations (at each N) to run per MPI task, <nsteps> is the length of Markov chain to run, <dt/sigma> is the crystallization timescale in units of sigma (analytical uncertainty), pulling synthetic data from a distribution specified in an ascii file `Distribution.tsv	
+for example:
+```bash
+mpiexec -np 16 ./tzircrystestaccuracy 4 10000 1 MeltsTZircDistribtuion.tsv > eruptionestimates1.tsv
+```
+to run on 16 cores with 4 simulations per taks, each 10000 MCMC steps long, with a dt/sigma of 1 and using the crystallization distribution found in a file called `MeltsTZircDistribtuion.tsv`.
+
+
+
