@@ -40,7 +40,7 @@ tzircrystmetropolis <nsteps> distribution.tsv  sample.tsv > output.tsv
 ```
 where <nsteps> is the length of Markov chain to run, `distribution.tsv` is an ascii file describing a zircon saturation distribution, `sample.tsv` is a  tab or comma-separated file containing a list of individual zircon ages and 2-sigma uncertainties; the resulting stationary distributions will be written to `output.tsv`. For example
 ```bash
-tzircrystmetropolis 10000 MeltsTZircDistribtuion.tsv  sample.tsv > output.tsv
+tzircrystmetropolis 10000 MeltsTZircDistribution.tsv  sample.tsv > metropolisdata.tsv
 ```
 
 The results of synthetic dataset tests, which compare traditional weighted-mean and youngest-zircon interpretations to Bayesian eruption age estimates (using several different crystallization distributions)  are provided in [examples/synthetic dataset tests/](examples/synthetic%20dataset%20tests/). Figures can be re-plotted using a Matlab script [tzircrystestaccuracyPlots.m](examples/synthetic%20dataset%20tests/tzircrystestaccuracyPlots.m).
@@ -53,16 +53,16 @@ mpiexec -np <number-of-tasks> ./tzircrystestaccuracy  <sims-per-task> <nsteps> <
 where <number-of-tasks> is the number of MPI tasks to run (typically you want this to be equal to the number of CPU cores or hardware threads you are running on),  <sims-per-task> is the number of simulations (at each N) to run per MPI task, <nsteps> is the length of Markov chain to run, <dt/sigma> is the crystallization timescale in units of sigma (analytical uncertainty), pulling synthetic data from a distribution specified in an ascii file `Distribution.tsv	
 for example:
 ```bash
-mpiexec -np 16 ./tzircrystestaccuracy 4 10000 1 MeltsTZircDistribtuion.tsv > eruptionestimates1.tsv
+mpiexec -np 16 ./tzircrystestaccuracy 4 10000 1 MeltsTZircDistribution.tsv > eruptionestimates1.tsv
 ```
-to run on 16 cores with 4 simulations per taks, each 10000 MCMC steps long, with a dt/sigma of 1 and using the crystallization distribution found in [MeltsTZircDistribtuion.tsv](distributions/MeltsTZircDistribtuion.tsv).  To run on a cluster, you will need a batch file suited to your cluster's workload manager. For instance, the example batchfile [runTest.pbs](examples/synthetic%20dataset%20tests/runTest.pbs):
+to run on 16 cores with 4 simulations per taks, each 10000 MCMC steps long, with a dt/sigma of 1 and using the crystallization distribution found in [MeltsTZircDistribution.tsv](distributions/MeltsTZircDistribution.tsv).  To run on a cluster, you will need a batch file suited to your cluster's workload manager. For instance, the example batchfile [runTest.pbs](examples/synthetic%20dataset%20tests/runTest.pbs):
 
 ```bash
 #!/bin/bash
 #PBS -l nodes=20:ppn=16,walltime=00:40:00
 
 module load openmpi
-mpiexec ./tzircrystestaccuracy 4 10000 1 MeltsTZircDistribtuion.tsv > eruptionestimates1.tsv
+mpiexec ./tzircrystestaccuracy 4 10000 1 MeltsTZircDistribution.tsv > eruptionestimates1.tsv
 ```
 
 runs 4 simulations per task on 20 nodes with 16 cores each, for a total of 1280 simulations at each N
