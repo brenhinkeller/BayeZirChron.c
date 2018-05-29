@@ -34,9 +34,9 @@ Compiling and running this parallel version additionally requires a working inst
 
 A range of [examples](examples/), including the application Bayesian zircon eruption age estimation code to literature datasets, is provided. A Matlab script to run all literature examples is provided in [examples/literature dataset tests/RunLiteratureExamples.m](examples/literature%20dataset%20tests/RunLiteratureExamples.m)
 
-The results of synthetic dataset tests, which compare traditional weighted-mean and youngest-zircon interpretations to Bayesian eruption age estimates (using several different crystallization distributions)  are provided in [examples/synthetic%20dataset%20tests/](examples/synthetic%20dataset%20tests/). Figures can be re-plotted using a Matlab script [tzircrystestaccuracyPlots.m](examples/synthetic%20dataset%20tests/tzircrystestaccuracyPlots.m).
+The results of synthetic dataset tests, which compare traditional weighted-mean and youngest-zircon interpretations to Bayesian eruption age estimates (using several different crystallization distributions)  are provided in [examples/synthetic dataset tests/](examples/synthetic%20dataset%20tests/). Figures can be re-plotted using a Matlab script [tzircrystestaccuracyPlots.m](examples/synthetic%20dataset%20tests/tzircrystestaccuracyPlots.m).
 
-To reproduce the datafiles provided in this folder, compile the parallel code tzircrystestaccuracy.c as described above (using mpicc), and run using
+To reproduce the datafiles provided in this folder, compile the parallel code [tzircrystestaccuracy.c](src/tzircrystestaccuracy.c) as described above (using mpicc), and run using
 
 ```bash
 mpiexec -np <number-of-tasks> ./tzircrystestaccuracy  <sims-per-task> <nsteps> <dt/sigma>  Distribution.tsv  > results.tsv
@@ -46,7 +46,17 @@ for example:
 ```bash
 mpiexec -np 16 ./tzircrystestaccuracy 4 10000 1 MeltsTZircDistribtuion.tsv > eruptionestimates1.tsv
 ```
-to run on 16 cores with 4 simulations per taks, each 10000 MCMC steps long, with a dt/sigma of 1 and using the crystallization distribution found in a file called `MeltsTZircDistribtuion.tsv`.
+to run on 16 cores with 4 simulations per taks, each 10000 MCMC steps long, with a dt/sigma of 1 and using the crystallization distribution found in a file called `MeltsTZircDistribtuion.tsv`.  To run on a cluster, you will need a batch file suited to your cluster's workload manager. For instance, the example batch file [runTest.pbs](examples/synthetic%20dataset%20tests/runTest.pbs)
+
+```bash
+#!/bin/bash
+#PBS -l nodes=20:ppn=16,walltime=00:40:00
+
+module load openmpi
+mpiexec ./tzircrystestaccuracy 4 10000 1 MeltsTZircDistribtuion.tsv > eruptionestimates1.tsv
+```
+
+runs 4 simulations per task on 20 nodes with 16 cores each, for a total of 1280 simulations at each N
 
 
 
