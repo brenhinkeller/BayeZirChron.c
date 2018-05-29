@@ -105,7 +105,8 @@ double checkZirconLikelihood(const double* restrict dist, const uint32_t distrow
 		Zf = 0;
 	} else {
 		const double f = (double)datarows-1;
-		Zf = exp((f/2-1)*log(mswd) - f/2*(mswd-1)); // Height of MSWD distribution relative to height at mswd = 1;
+		//Zf = exp(f/2*log(f/2) - stirling_lgamma(f/2) + (f/2-1)*log(mswd) - f/2*mswd); // Distribution of the MSWD for normally-distributed data, from Wendt and Carl 1991
+		Zf = exp((f/2-1)*log(mswd) - f/2*(mswd-1)); // Height of MSWD distribution relative to height at mswd = 1; from Wendt and Carl 1991
 	}
 
 	// At low N (low sample numbers), favor the weighted mean interpretation at high Zf
@@ -149,10 +150,9 @@ int findMetropolisEstimate(pcg32_random_t* rng, const double* dist, const uint32
 			tmax_proposed = tmax + pcg_gaussian_ziggurat(rng, tmax_step);
 		}
 
-
-//		// Uniformly adjust upper and lower bound age
-//		tmin_proposed = tmin + pcg_gaussian_ziggurat(rng, tmin_step);
-//		tmax_proposed = tmax + pcg_gaussian_ziggurat(rng, tmax_step);
+		// // Uniformly adjust upper and lower bound age
+		// tmin_proposed = tmin + pcg_gaussian_ziggurat(rng, tmin_step);
+		// tmax_proposed = tmax + pcg_gaussian_ziggurat(rng, tmax_step);
 
 		// Swap upper and lower bound if they get reversed
 		if (tmin_proposed>tmax_proposed){
@@ -221,6 +221,11 @@ int main(int argc, char **argv){
 	// Import data
 	const double* dist = csvparseflat(argv[4],'\t', &distrows, &distcolumns);
 
+	double* uniformdist = malloc(distrows*sizeof(double));
+	for (i=0;i<distrows;i++){
+		uniformdist[i]=1;
+	}
+
 	// Declare various variables
 	pcg32_random_t rng;
 	pcg32_srandom_r(&rng,time(NULL), world_rank);
@@ -236,13 +241,11 @@ int main(int argc, char **argv){
 	double absuncert = reluncert*tmin_true;
 	double tmax_true = tmin_true*(1+relagerange);
 
-
-//	double* synzirc = malloc(Nmax * sizeof(double));
 	double* data = malloc(Nmax * sizeof(double));
 	double* uncert = malloc(Nmax * sizeof(double));
 	double wx, wsigma, mswd, minuncert; // For weighted mean
-	double tmin_metropolis_mswd, tmin_metropolis_est, tmin_obs, tmin_mswd_test; // Means
-	double tmin_metropolis_mswd_sigma, tmin_metropolis_est_sigma, tmin_obs_sigma, tmin_mswd_test_sigma; // Standard deviations
+	double tmin_metropolis_uniform, tmin_metropolis_est, tmin_obs, tmin_mswd_test; // Means
+	double tmin_metropolis_uniform_sigma, tmin_metropolis_est_sigma, tmin_obs_sigma, tmin_mswd_test_sigma; // Standard deviations
 
 	for (i=0; i<nNs; i++){
 		N = Ns[i];
@@ -254,19 +257,31 @@ int main(int argc, char **argv){
 		for (j=0; j<simspertask; j++){
 			generateSyntheticZirconDataset(&rng, dist, distrows, tmin_true, tmax_true, uncert, data, N);
 
+			// Find metropolis estimate of eruption age
 			findMetropolisEstimate(&rng, dist, distrows, data, uncert, N, nsteps, &tmin_metropolis_est, &tmin_metropolis_est_sigma);
-
-			//Check that metropolis uncertainty hasn't fallen below theoretical minimum
+			tmin_metropolis_est_sigma = 1.253*tmin_metropolis_est_sigma; //Convert from mean absolute deviation to standard deviation
+			//Check that metroplis uncertainty hasn't fallen below theoretical minimum
 			minuncert = nanmean(uncert,N)/sqrt(N);
 			if (tmin_metropolis_est_sigma < minuncert){
 				tmin_metropolis_est_sigma = minuncert;
 			}
 
+
+			// Find metropolis estimate of eruption age with uniform (noninformative) prior distribution
+			findMetropolisEstimate(&rng, uniformdist, distrows, data, uncert, N, nsteps, &tmin_metropolis_uniform, &tmin_metropolis_uniform_sigma);
+			tmin_metropolis_uniform_sigma = 1.253*tmin_metropolis_uniform_sigma; //Convert from mean absolute deviation to standard deviation
+			//Check that metroplis uncertainty hasn't fallen below theoretical minimum
+			minuncert = nanmean(uncert,N)/sqrt(N);
+			if (tmin_metropolis_uniform_sigma < minuncert){
+				tmin_metropolis_uniform_sigma = minuncert;
+			}
+
+			// Find weighted mean of youngest n zircons with acceptable MSWD ("MSWD test")
 			sort_doubles(data, N);
 			tmin_mswd_test = data[0];
 			tmin_mswd_test_sigma = absuncert;
 			for (k=2; k<N+1; k++){
-				wmean(data, uncert, k, &wx, &wsigma, &mswd);
+				awmean(data, uncert, k, &wx, &wsigma, &mswd);
 				if (mswd > 1.0 + 2.0 * sqrt(2.0/(double)(k-1))){
 					break;
 				}
@@ -274,22 +289,14 @@ int main(int argc, char **argv){
 				tmin_mswd_test_sigma = wsigma;
 			}
 
-			wmean(data, uncert, N, &wx, &wsigma, &mswd);
+			// Find weighted mean
+			awmean(data, uncert, N, &wx, &wsigma, &mswd);
 
+			// Find youngest zircon
 			tmin_obs = minArray(data, N);
 			tmin_obs_sigma = absuncert;
 
-
-			if (mswd < 1.0 + 2.0 * sqrt(2.0/(double)(N-1))){
-				tmin_metropolis_mswd = wx;
-				tmin_metropolis_mswd_sigma = wsigma;
-			} else {
-				tmin_metropolis_mswd = tmin_metropolis_est;
-				tmin_metropolis_mswd_sigma = tmin_metropolis_est_sigma;
-			}
-
-
-			printf("%i\t%g\t%g\t%g\t%g\t%g\t%g\t%g\t%g\t%g\t%g\t%g\n", N, mswd, (wx-tmin_true)/absuncert, (tmin_mswd_test-tmin_true)/absuncert, (tmin_obs-tmin_true)/absuncert, (tmin_metropolis_est-tmin_true)/absuncert, (tmin_metropolis_mswd-tmin_true)/absuncert, (wx-tmin_true)/wsigma*1.253, (tmin_mswd_test-tmin_true)/tmin_mswd_test_sigma*1.253, (tmin_obs-tmin_true)/tmin_obs_sigma*1.253, (tmin_metropolis_est-tmin_true)/tmin_metropolis_est_sigma*1.253, (tmin_metropolis_mswd-tmin_true)/tmin_metropolis_mswd_sigma)*1.253;
+			printf("%i\t%g\t%g\t%g\t%g\t%g\t%g\t%g\t%g\t%g\t%g\t%g\n", N, mswd, (wx-tmin_true)/absuncert, (tmin_mswd_test-tmin_true)/absuncert, (tmin_obs-tmin_true)/absuncert, (tmin_metropolis_est-tmin_true)/absuncert, (tmin_metropolis_uniform-tmin_true)/absuncert, (wx-tmin_true)/wsigma*1.253, (tmin_mswd_test-tmin_true)/tmin_mswd_test_sigma*1.253, (tmin_obs-tmin_true)/tmin_obs_sigma*1.253, (tmin_metropolis_est-tmin_true)/tmin_metropolis_est_sigma*1.253, (tmin_metropolis_uniform-tmin_true)/tmin_metropolis_uniform_sigma)*1.253;
 			//N.B.: factor of 1.253 converts from mean absolute deviation to standard deviation
 		}
 	}

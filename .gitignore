@@ -13,3 +13,8 @@ tzircrystmetropolis1sigma
 /Kyle*
 /Roland*
 /Other
+
+# Excess results and intermediate products
+*.fig
+/results/*.tsv
+metropolisdata.tsv

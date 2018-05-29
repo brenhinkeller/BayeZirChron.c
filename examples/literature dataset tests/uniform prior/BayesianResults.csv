@@ -1,0 +1,11 @@
+Name,Distribution,LiteratureAge,EruptionAge,EruptionAge_Sigma,SaturationAge,SaturationAge_Sigma
+CrowleyBishopTuff,Uniform,NaN,0.765958,0.000689748,0.773778,0.0017794
+CrowleyFilteredBishopTuff,Uniform,NaN,0.766006,0.000568828,0.768397,0.000657677
+IckertBishopTuff,Uniform,NaN,0.764979,0.00165032,0.788592,0.00228797
+WotzlawFCTMLX,Uniform,NaN,28.2314,0.0099364,28.6257,0.0114449
+WotzlawFCTMLXYoung,Uniform,NaN,28.2082,0.0129015,28.244,0.01209
+WotzlawNutrasCreekDacite,Uniform,NaN,28.2454,0.0146614,28.6358,0.0220218
+WotzlawFishCanyonAll,Uniform,NaN,28.2334,0.0115727,28.6297,0.00695205
+WotzlawKilgoreTuff,Uniform,NaN,4.4791,0.00158535,4.4936,0.00183214
+RiveraAlderCreek,Uniform,NaN,1.20144,0.00247706,1.37683,0.00688518
+RiveraAlderCreekA,Uniform,NaN,1.19413,0.00599232,1.22699,0.00533514
