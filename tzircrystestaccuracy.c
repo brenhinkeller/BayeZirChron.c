@@ -1,7 +1,7 @@
 /******************************************************************************
  * FILE: tzircrystestaccuracy.c
- * DESCRIPTION: Creates multiple synthetic zircon datasets of varying N, and 
- * compares accuracy of weighted mean, youngest-zircon, and Bayesian 
+ * DESCRIPTION: Creates multiple synthetic zircon datasets of varying N, and
+ * compares accuracy of weighted mean, youngest-zircon, and Bayesian
  * metropolis walker estimates for time of final zircon crystallization.
  * AUTHOR: C. Brenhin Keller
  ******************************************************************************/
@@ -26,10 +26,10 @@
 
 void drawFromDistribution(pcg32_random_t* rng, const double* dist, const uint32_t distrows, double* x, const uint32_t xrows){
 	const double dist_yrandmax = UINT32_MAX / maxArray(dist,distrows);
-	const double dist_xscale = (double)(distrows-1); 
+	const double dist_xscale = (double)(distrows-1);
 	const double dist_xrandmax = UINT32_MAX / dist_xscale;
 	double rx, ry, y;
- 
+
 	for (int i=0; i<xrows; i++){
 		x[i] = -1;
 		while (x[i]==-1){
@@ -105,11 +105,14 @@ double checkZirconLikelihood(const double* restrict dist, const uint32_t distrow
 		Zf = 0;
 	} else {
 		const double f = (double)datarows-1;
-		//Zf = exp(f/2*log(f/2) - stirling_lgamma(f/2) + (f/2-1)*log(mswd) - f/2*mswd); // Distribution of the MSWD for normally-distributed data, from Wendt and Carl 1991
 		Zf = exp((f/2-1)*log(mswd) - f/2*(mswd-1)); // Height of MSWD distribution relative to height at mswd = 1;
 	}
 
-	return loglikelihood  - ( log10((fabs(tmin - wm)+wsigma)/wsigma)*Zf + log10((fabs(tmax - wm)+wsigma)/wsigma)*Zf + log10((fabs(tmin - data[0])+uncert[0])/uncert[0])*(1-Zf) + log10((fabs(tmax - data[datarows-1])+uncert[datarows-1])/uncert[datarows-1])*(1-Zf) ) * (2/log10(1+datarows)); 
+	// At low N (low sample numbers), favor the weighted mean interpretation at high Zf
+ 	// (MSWD close to 1) and the youngest-zircon interpretation at low Zf (MSWD far from one).
+ 	// This is helpful to for preventing instability at low N, with the funcional form
+ 	// used here derived from training against synthetic datasets.
+	return loglikelihood  - ( log10((fabs(tmin - wm)+wsigma)/wsigma)*Zf + log10((fabs(tmax - wm)+wsigma)/wsigma)*Zf + log10((fabs(tmin - data[0])+uncert[0])/uncert[0])*(1-Zf) + log10((fabs(tmax - data[datarows-1])+uncert[datarows-1])/uncert[datarows-1])*(1-Zf) ) * (2/log10(1+datarows));
 }
 
 
@@ -127,7 +130,7 @@ int findMetropolisEstimate(pcg32_random_t* rng, const double* dist, const uint32
 
 	double tmins[nsteps+burnin];
 
-	
+
 	tmin = tmin_obs;
 	tmax = tmax_obs;
 	tmin_proposed = tmin_obs;
@@ -166,7 +169,7 @@ int findMetropolisEstimate(pcg32_random_t* rng, const double* dist, const uint32
 		if (r < pow(10,theta_proposed-theta)){
 			if (tmin_proposed != tmin){
 				tmin_step = fabs(tmin_proposed-tmin)*2.9;
-			} 
+			}
 			if (tmax_proposed != tmax){
 				tmax_step = fabs(tmax_proposed-tmax)*2.9;
 			}
@@ -194,7 +197,7 @@ int main(int argc, char **argv){
 	}
 
 	// Start MPI
-	rc = MPI_Init(&argc,&argv); 
+	rc = MPI_Init(&argc,&argv);
 	if (rc != MPI_SUCCESS) {
 		printf ("Error starting MPI program. Terminating.\n"); MPI_Abort(MPI_COMM_WORLD, rc);
 	}
@@ -209,14 +212,14 @@ int main(int argc, char **argv){
 
 	// Get number of simulations per MPI task from command-line argument
 	const uint32_t simspertask = (uint32_t)abs(atoi(argv[1]));
-	// Get number of steps for metropolis walker to take	
+	// Get number of steps for metropolis walker to take
 	const uint32_t nsteps = (uint32_t)abs(atoi(argv[2]));
-	// Get dt/sigma value to run at	
+	// Get dt/sigma value to run at
 	const double dt_sigma = fabs(atof(argv[3]));
 
 
-	// Import data	
-	const double* dist = csvparseflat(argv[4],'\t', &distrows, &distcolumns);	
+	// Import data
+	const double* dist = csvparseflat(argv[4],'\t', &distrows, &distcolumns);
 
 	// Declare various variables
 	pcg32_random_t rng;
@@ -252,14 +255,12 @@ int main(int argc, char **argv){
 			generateSyntheticZirconDataset(&rng, dist, distrows, tmin_true, tmax_true, uncert, data, N);
 
 			findMetropolisEstimate(&rng, dist, distrows, data, uncert, N, nsteps, &tmin_metropolis_est, &tmin_metropolis_est_sigma);
-			tmin_metropolis_est_sigma = 1.253*tmin_metropolis_est_sigma;//Convert from mean absolute deviation to standard deviation
 
-			//Check that metroplis uncertainty hasn't fallen below theoretical minimum
+			//Check that metropolis uncertainty hasn't fallen below theoretical minimum
 			minuncert = nanmean(uncert,N)/sqrt(N);
 			if (tmin_metropolis_est_sigma < minuncert){
 				tmin_metropolis_est_sigma = minuncert;
 			}
-			//sqrt(tmin_metropolis_est_sigma*tmin_metropolis_est_sigma + minuncert*minuncert);
 
 			sort_doubles(data, N);
 			tmin_mswd_test = data[0];
@@ -289,9 +290,10 @@ int main(int argc, char **argv){
 
 
 			printf("%i\t%g\t%g\t%g\t%g\t%g\t%g\t%g\t%g\t%g\t%g\t%g\n", N, mswd, (wx-tmin_true)/absuncert, (tmin_mswd_test-tmin_true)/absuncert, (tmin_obs-tmin_true)/absuncert, (tmin_metropolis_est-tmin_true)/absuncert, (tmin_metropolis_mswd-tmin_true)/absuncert, (wx-tmin_true)/wsigma*1.253, (tmin_mswd_test-tmin_true)/tmin_mswd_test_sigma*1.253, (tmin_obs-tmin_true)/tmin_obs_sigma*1.253, (tmin_metropolis_est-tmin_true)/tmin_metropolis_est_sigma*1.253, (tmin_metropolis_mswd-tmin_true)/tmin_metropolis_mswd_sigma)*1.253;
+			//N.B.: factor of 1.253 converts from mean absolute deviation to standard deviation
 		}
 	}
-	
+
 MPI_Finalize();
 return 0;
 }

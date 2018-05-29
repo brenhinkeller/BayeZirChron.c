@@ -14,30 +14,6 @@
  #include "gauss.h"
 
 
-
- void drawFromDistribution(pcg32_random_t* rng, const double* dist, const uint32_t distrows, double* x, const uint32_t xrows){
- 	// Draw N = xrows random numbers from the distribution 'dist'
- 	const double dist_yrandmax = UINT32_MAX / maxArray(dist,distrows);
- 	const double dist_xscale = (double)(distrows-1);
- 	const double dist_xrandmax = UINT32_MAX / dist_xscale;
- 	double rx, ry, y;
-
- 	for (int i=0; i<xrows; i++){
- 		x[i] = -1;
- 		while (x[i] == -1){
- 			// Pick random x value
- 			rx = pcg32_random_r(rng) / dist_xrandmax;
- 			// Interpolate corresponding distribution value
- 			y = interp1i(dist,rx);
- 			// See if x value is accepted
- 			ry = pcg32_random_r(rng) / dist_yrandmax;
- 			if (y > ry){
- 				x[i] = rx / dist_xscale;
- 			}
- 		}
- 	}
- }
-
  double checkZirconLikelihood(const double* restrict dist, const uint32_t distrows, const double* restrict data, const double* restrict uncert, const uint32_t datarows, const double tmin, const double tmax){
  	// Return the log-likelihood of drawing the dataset 'data' from the distribution 'dist'
  	double Zf, ix, wm, wsigma, mswd, distx, likelihood, loglikelihood = 0;

@@ -1,0 +1,15 @@
+.DS_Store
+
+
+# Executables
+tzircrystestaccuracy
+tzircrystimage
+tzircrystmetropolis
+tzircrystmetropolis1sigma
+
+# Other folders
+/old*
+/Al*
+/Kyle*
+/Roland*
+/Other
