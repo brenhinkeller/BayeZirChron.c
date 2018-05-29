@@ -28,4 +28,4 @@ or
 ```bash
 mpicc -std=c11 -O3 -o tzircrystestaccuracy tzircrystestaccuracy.c
 ```
-Compiling and running this parallel version additionally requires a working installation of MPI (either [Open MPI](https://www.open-mpi.org) or [MPICH](https://www.mpich.org)) A sample batchfile is provided in the example folder: [runTest.pbs](examples/synthetic\ dataset\ tests/runTest.pbs)
+Compiling and running this parallel version additionally requires a working installation of MPI (either [Open MPI](https://www.open-mpi.org) or [MPICH](https://www.mpich.org)) A sample batchfile is provided in the example folder: [runTest.pbs](examples/synthetic%20dataset%20tests/runTest.pbs)
