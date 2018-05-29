@@ -16,5 +16,7 @@ tzircrystmetropolis1sigma
 
 # Excess results and intermediate products
 *.fig
+*.m~
 /results/*.tsv
 metropolisdata.tsv
+BootstrappedDistribution.tsv
