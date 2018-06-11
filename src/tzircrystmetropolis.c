@@ -27,7 +27,7 @@
  			// Find (double) index
  			ix = (tmax - data[j])/dt*dist_xscale;
  			// Interpolate corresponding distribution value
- 			likelihood = interp1i(dist,ix)/dt;
+ 			likelihood = interp1i(dist,ix)/(dt * dist_yave);
  		// Otherwise, sum contributions from Gaussians at each point in distribution
  		} else {
  			likelihood = 0;

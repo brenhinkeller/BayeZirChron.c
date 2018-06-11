@@ -1,4 +1,5 @@
 % Run from /examples/BootstrappedSaturationDistributionExamples
+
 %% Load and stack Bergell data
 % Data from Samperton et al., 2017
 bergell = str2double(importc('BergellAll.csv',','));
