@@ -15,6 +15,7 @@ end
 figure; plot(bergell(:),'.','MarkerSize',10)
 xlabel("N"); ylabel("Age, scaled")
 
+
 %% Load and stack Elba data
 % load data -- from Barboni, Annen, and Schoene 2015, including many units
 elba = str2double(importc('ElbaAll.csv',','));
@@ -45,15 +46,15 @@ xlabel("N"); ylabel("Age, scaled")
 
 %% Calculate and plot distributions
 npoints = 100;
-bwcutoff = 1;
-[bergell_f,bergell_x,bergell_bw] = ksdensity(bergell_all);
-[elba_f,elba_x,elba_bw] = ksdensity(elba_all);
-[FC_f,FC_x,FC_bw] = ksdensity(FC_all);
+[bergell_f,bergell_x,bergell_bw] = ksdensity(bergell(:));
+[elba_f,elba_x,elba_bw] = ksdensity(elba(:));
+[FC_f,FC_x,FC_bw] = ksdensity(FC(:));
+
 
 % Obtain ksdensity values between 0-bandwith and 1+2*bandwidth
-bdist = interp1(bergell_x,bergell_f,linspace(0-bwcutoff*bergell_bw,1+2*bergell_bw,npoints));
-edist = interp1(elba_x,elba_f,linspace(0-bwcutoff*elba_bw,1+2*elba_bw,npoints));
-FCdist = interp1(FC_x,FC_f,linspace(0-bwcutoff*FC_bw,1+2*FC_bw,npoints));
+bdist = interp1(bergell_x,bergell_f,linspace(0-0.05,1+2*bergell_bw,npoints));
+edist = interp1(elba_x,elba_f,linspace(0-0.05,1+2*elba_bw,npoints));
+FCdist = interp1(FC_x,FC_f,linspace(0-0.05*FC_bw,1+2*FC_bw,npoints));
 
 % Normalize each distribution
 x = linspace(0,1,npoints);

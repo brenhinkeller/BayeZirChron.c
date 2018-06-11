@@ -18,7 +18,6 @@ sample.ReportedWMUncertainty = [0.000725; 0.0009/2; 0.0009/2; NaN; NaN; NaN; NaN
 sample.ReportedArAge = [0.7666; 0.7666; 0.7666; 28.201; 28.201; 28.201; 28.201; NaN; 1.1848;]; 
 sample.ReportedArUncertainty = [0.0008/2; 0.0008/2; 0.0008/2; 0.046/2; 0.046/2; 0.046/2; 0.046/2; NaN; 0.0006;]; 
 sample.Distribution = {'VolcanicZirconLowX';'VolcanicZirconLowX';'VolcanicZirconLowX';'VolcanicZircon';'VolcanicZircon';'VolcanicZircon';'VolcanicZircon';'VolcanicZircon';'VolcanicZircon';};
-% sample.Distribution = {'Uniform';'Uniform';'Uniform';'Uniform';'Uniform';'Uniform';'Uniform';'Uniform';'Uniform';};
 
 % Run Metropolis walker for each sample
 for i=1:length(sample.Name)
@@ -28,24 +27,41 @@ for i=1:length(sample.Name)
         data = load([sample.Name{i} '.csv']);
         sample.(sample.Name{i}).Age = data(:,1);
         sample.(sample.Name{i}).Age_Sigma = data(:,2);
-        agescaled = sample.(sample.Name{i}).Age - min(sample.(sample.Name{i}).Age);
+        
+        % Maximum extent of expected analytical tail (beyond eruption/deposition)
+        maxTailLength = mean(data(:,2))/2 * NormQuantile(1 - 1/(1+size(data,1)));
+        included = (data(:,1)-min(data(:,1))) >= maxTailLength;
+        
+        % Ages scaled from 0 to 1
+        agescaled = data(included,1) - min(data(included,1));
         agescaled = agescaled./max(agescaled);
+        
     % Obtain ksdensity values between 0 and 1+bandwidth
         npoints = 100;
         bwcutoff = 2;
         [f,x,bw] = ksdensity(agescaled);
-        BootstrappedDistribution = interp1(x,f,linspace(0,1+bwcutoff*bw,npoints));
+        BootstrappedDistribution = interp1(x,f,linspace(0-0.05,1+bwcutoff*bw,npoints));
+        
     % Normalize the distribution
         x = linspace(0,1,npoints);
         BootstrappedDistribution = BootstrappedDistribution./trapz(x,BootstrappedDistribution);
         exportmatrix(flipud(BootstrappedDistribution'),'BootstrappedDistribution.tsv','\t');
-        % figure; plot(x,BootstrappedDistribution)
-        % set(gca,'xdir','reverse')
+        sample.Distribution{i} = 'Bootstrapped';
+        figure; plot(x,BootstrappedDistribution)
+        xlabel('Age'); ylabel('Density'),title(sample.Name{i})
+       
+    tic;
     system(['../../src/tzircrystmetropolis ' num2str(nsteps) ' ./BootstrappedDistribution.tsv ' sample.Name{i} '.csv > metropolisdata.tsv']);
+    toc
+    
+    %%%%%%%%%%%%%%%%%%%%%%%%%% Volcanic prior %%%%%%%%%%%%%%%%%%%%%%%%%%
+    
+%     system(['../../src/tzircrystmetropolis ' num2str(nsteps) ' ../../distributions/' sample.Distribution{i} 'Distribution.tsv ' sample.Name{i} '.csv > metropolisdata.tsv']);
 
-    %%%%%%%%%%%%%%%%%%%%%% Uniform or Volcanic prior %%%%%%%%%%%%%%%%%%%%%%
+    %%%%%%%%%%%%%%%%%%%%%%%%%% Uniform prior %%%%%%%%%%%%%%%%%%%%%%%%%%
 
-    system(['../../src/tzircrystmetropolis ' num2str(nsteps) ' ../../distributions/' sample.Distribution{i} 'Distribution.tsv ' sample.Name{i} '.csv > metropolisdata.tsv']);
+%     sample.Distribution{i} = 'Uniform';
+%     system(['../../src/tzircrystmetropolis ' num2str(nsteps) ' ../../distributions/' sample.Distribution{i} 'Distribution.tsv ' sample.Name{i} '.csv > metropolisdata.tsv']);
 
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -78,6 +94,6 @@ for i=1:length(sample.Name)
     xlim([0 size(data,1)+4])
     title(regexprep(sample.Name{i},'_','-'));
     formatfigure;
-%     saveas(gcf,[sample.Name{i} 'ages.eps'],'epsc');
+    saveas(gcf,[sample.Name{i} 'ages.eps'],'epsc');
 end
 
