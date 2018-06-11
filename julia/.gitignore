@@ -1,0 +1,12 @@
+.DS_Store
+
+# Unwanted Julia file types
+*.jl.cov
+*.jl.*.cov
+*.jl.mem
+deps/deps.jl
+
+# Various output files
+*.pdf
+*.csv
+*.out
