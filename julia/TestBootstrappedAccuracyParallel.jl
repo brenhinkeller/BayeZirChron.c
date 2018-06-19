@@ -20,7 +20,7 @@
         using KernelDensity: kde
 
         # Functions we'll be using here
-        include("DistTools.jl")
+        include("DistTools.jl");
 
         # Run the test for the following number of analyses
         Ns = [1,2,3,4,6,8,11,16,23,32,45,64,91,128,181,256,362,512,724,1024];
