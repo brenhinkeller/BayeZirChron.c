@@ -74,4 +74,6 @@ set(gca,'xdir','reverse')
 xlabel("Age (scaled)")
 ylabel("Density")
 formatfigure
-
+fig = gcf;
+fig.PaperSize = [fig.PaperPosition(3) fig.PaperPosition(4)];
+saveas(fig,'EmpiricalCrystDistributionEstimates.pdf')
