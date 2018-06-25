@@ -52,9 +52,9 @@ npoints = 100;
 
 
 % Obtain ksdensity values between 0-bandwith and 1+2*bandwidth
-bdist = interp1(bergell_x,bergell_f,linspace(0-0.05,1+2*bergell_bw,npoints));
-edist = interp1(elba_x,elba_f,linspace(0-0.05,1+2*elba_bw,npoints));
-FCdist = interp1(FC_x,FC_f,linspace(0-0.05*FC_bw,1+2*FC_bw,npoints));
+bdist = interp1(bergell_x,bergell_f,linspace(0-0.05,1+bergell_bw,npoints));
+edist = interp1(elba_x,elba_f,linspace(0-0.05,1+elba_bw,npoints));
+FCdist = interp1(FC_x,FC_f,linspace(0-0.05*FC_bw,1+FC_bw,npoints));
 
 % Normalize each distribution
 x = linspace(0,1,npoints);
