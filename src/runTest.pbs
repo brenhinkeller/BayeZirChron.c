@@ -1,0 +1,5 @@
+#!/bin/bash
+#PBS -l nodes=8:ppn=40,walltime=00:40:00
+
+module load openmpi
+mpiexec ./tzircrystestaccuracy 4 10000 1 MeltsTZircDistribution.tsv > eruptionestimates1.tsv
