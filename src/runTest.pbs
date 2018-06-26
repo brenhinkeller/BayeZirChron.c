@@ -2,4 +2,7 @@
 #PBS -l nodes=8:ppn=40,walltime=00:40:00
 
 module load openmpi
-mpiexec ./tzircrystestaccuracy 4 10000 1 MeltsTZircDistribution.tsv > eruptionestimates1.tsv
+mpiexec ./tzircrystestaccuracydist 4 10000 0.01 ../distributions/TruncatedNormalDistribution.tsv ../distributions/MeltsTZircDistribution.tsv > eruptionestimates0.01.log
+mpiexec ./tzircrystestaccuracydist 4 10000 1 ../distributions/TruncatedNormalDistribution.tsv ../distributions/MeltsTZircDistribution.tsv > eruptionestimates1.log
+mpiexec ./tzircrystestaccuracydist 4 10000 2 ../distributions/TruncatedNormalDistribution.tsv ../distributions/MeltsTZircDistribution.tsv > eruptionestimates2.log
+mpiexec ./tzircrystestaccuracydist 4 10000 10 ../distributions/TruncatedNormalDistribution.tsv ../distributions/MeltsTZircDistribution.tsv > eruptionestimates10.log

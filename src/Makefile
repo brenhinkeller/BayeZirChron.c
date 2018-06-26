@@ -6,5 +6,6 @@ serial:
 parallel:
 	mpicc -std=c11 -O3 -o tzircrystestaccuracy tzircrystestaccuracy.c
 	mpicc -std=c11 -O3 -o tzircrystestaccuracyuniform tzircrystestaccuracyuniform.c
+	mpicc -std=c11 -O3 -o tzircrystestaccuracydist tzircrystestaccuracydist.c
 
 all: 	serial parallel
