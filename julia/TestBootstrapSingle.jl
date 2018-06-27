@@ -32,7 +32,7 @@
     plot(dist, label="bootstrapped", ylabel="density", legend=:topleft)
     plot!(linspace(0,80,100),MeltsVolcanicZirconDistribution,label="original")
 
-## ---
+## --- Run MCMC
 
     # Run MCMC to estimate saturation and eruption/deposition age distributions
     # (tminDist,~,~,~) = crystMinMaxMetropolis(nsteps,dist,ages,uncert);
@@ -42,3 +42,12 @@
     AgeEst = mean(tminDist[burnin:end]);
     AgeEst_sigma = std(tminDist[burnin:end]);
     print("$AgeEst +/- $AgeEst_sigma Ma")
+
+## -- Plot some example distributions
+
+    h = plot(linspace(0,1,length(UniformDistribution)),UniformDistribution./mean(UniformDistribution),label="Uniform")
+    plot!(linspace(0,1,length(MeltsVolcanicZirconDistribution)),MeltsVolcanicZirconDistribution./mean(MeltsVolcanicZirconDistribution),label="MELTS Volcanic")
+    plot!(linspace(0,1,length(TruncatedNormalDistribution)),TruncatedNormalDistribution./mean(TruncatedNormalDistribution),label="Truncated Normal")
+    plot!(legend=:bottomleft,fg_color_legend=:white,xlabel="Time (unitless)",ylabel="Probability Density")
+    savefig(h,"DistributionComparison.pdf")
+## ---
