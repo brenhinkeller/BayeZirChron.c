@@ -73,5 +73,5 @@ runs 4 simulations per task on 20 nodes with 16 cores each, for a total of 1280 
 
 See [julia](julia/) folder. Try it out in this [interactive Jupyter notebook](https://mybinder.org/v2/gh/brenhinkeller/BayeZirChron.c/master?filepath=julia%2Fdemo.ipynb) via [Binder](https://mybinder.org)!
 
-For a more polished implementation, see [Chron.jl](https://github.com/brenhinkeller/Chron.jl)
+See also [Chron.jl](https://github.com/brenhinkeller/Chron.jl)
 
