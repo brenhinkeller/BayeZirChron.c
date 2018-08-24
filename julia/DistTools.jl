@@ -1,6 +1,6 @@
     # How far away from the mean (in units of sigma) should we expect proportion
     # F of the samples to fall
-    function NormQuantile(F)
+    function norm_quantile(F)
         return sqrt(2)*erfinv(2*F-1)
     end
 
@@ -26,7 +26,7 @@
 
     # Draw random numbers from a distribution specified by a vector of points
     # defining the PDF curve
-    function drawFromDistribution(dist::Array{Float64}, n::Int)
+    function draw_from_distribution(dist::Array{Float64}, n::Int)
         # Draw n random numbers from the distribution 'dist'
         x = Array{Float64}(n);
         dist_ymax = maximum(dist);
@@ -76,7 +76,7 @@
     end
 
     # Return the log-likelihood of a proposed crystallization distribution, with adjustments to prevent runaway at low N
-    function checkCrystLogLikelihood(dist::Array{Float64}, data::Array{Float64}, uncert::Array{Float64}, tmin::Float64, tmax::Float64)
+    function check_cryst_LL(dist::Array{Float64}, data::Array{Float64}, uncert::Array{Float64}, tmin::Float64, tmax::Float64)
         # Define some frequently used variables
         loglikelihood = 0.0;
         datarows = length(data);
@@ -131,7 +131,7 @@
     # Run a Metropolis sampler to estimate the extrema of a finite-range distribution from samples drawn
     # from that distribution -- e.g., estimate zircon saturation and eruption ages from a distribution of
     # zircon crystallization ages.
-    function crystMinMetropolis(nsteps::Int,dist::Array{Float64},data::Array{Float64},uncert::Array{Float64},tminDist::Array{Float64,1})
+    function metropolis_min(nsteps::Int,dist::Array{Float64},data::Array{Float64},uncert::Array{Float64},tminDist::Array{Float64,1})
         # standard deviation of the proposal function is stepfactor * last step; this is tuned to optimize accetance probability at 50%
         stepfactor = 2.9;
         # Sort the data array from youngest to oldest
@@ -152,7 +152,7 @@
         tmin_proposed = tmin;
         tmax_proposed = tmax;
         # Log likelihood of initial proposal
-        ll =  checkCrystLogLikelihood(dist, data, uncert, tmin, tmax);
+        ll =  check_cryst_LL(dist, data, uncert, tmin, tmax);
         ll_proposed = ll;
         # Step through each of the N steps in the Markov chain
         for i=1:nsteps
@@ -171,7 +171,7 @@
                 tmax_proposed = r;
             end
             # Calculate log likelihood for new proposal
-            ll_proposed =  checkCrystLogLikelihood(dist, data, uncert, tmin_proposed, tmax_proposed);
+            ll_proposed =  check_cryst_LL(dist, data, uncert, tmin_proposed, tmax_proposed);
             # Decide to accept or reject the proposal
             if rand() < exp(ll_proposed-ll)
                 if tmin_proposed != tmin
@@ -191,7 +191,7 @@
     end
 
 
-## --- Function for parallel workers to evaluage
+## --- Function for parallel workers to evaluate
 
     function BootstrapEachN(DistributionToDrawFrom,Ns,nsteps,burnin,dt_sigma)
         tminDist = Array{Float64,1}(nsteps);
@@ -200,11 +200,11 @@
         for j=1:length(Ns)
             N = Ns[j]
             # Draw new set of ages where true minimum == 0 and analytical sigma == 1
-            ages = drawFromDistribution(DistributionToDrawFrom,N).*dt_sigma + randn(N);
+            ages = draw_from_distribution(DistributionToDrawFrom,N).*dt_sigma + randn(N);
             uncert = ones(N)
 
             # Maximum extent of expected analytical tail (beyond eruption/deposition)
-            maxTailLength = mean(uncert) * NormQuantile(1-1/(1+length(ages)));
+            maxTailLength = mean(uncert) * norm_quantile(1-1/(1+length(ages)));
             included = (ages-minimum(ages)) .>= maxTailLength;
 
             # Bootstrapped crystallization distribution, excluding maximum analytical tail
@@ -217,8 +217,7 @@
             end
 
             # Run MCMC to estimate saturation and eruption/deposition age distributions
-            # (tminDist,~,~,~) = crystMinMaxMetropolis(nsteps,dist,ages,uncert);
-            crystMinMetropolis(nsteps,dist,ages,uncert,tminDist);
+            metropolis_min(nsteps,dist,ages,uncert,tminDist);
 
             AgeEst[j] = mean(tminDist[burnin:end]);
     	    AgeEst_sigma[j] = std(tminDist[burnin:end]);

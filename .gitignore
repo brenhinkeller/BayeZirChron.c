@@ -22,3 +22,4 @@ tzircrystmetropolis1sigma
 /examples/*/*.tsv
 metropolisdata.tsv
 BootstrappedDistribution.tsv
+.ipynb_*

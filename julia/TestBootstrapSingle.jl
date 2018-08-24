@@ -14,11 +14,11 @@
 
     N = 10
     # Draw new set of ages where true minimum == 0 and analytical sigma == 1
-    ages = drawFromDistribution(MeltsVolcanicZirconDistribution,N).*dt_sigma + randn(N);
+    ages = draw_from_distribution(MeltsVolcanicZirconDistribution,N).*dt_sigma + randn(N);
     uncert = ones(N)
 
     # Maximum extent of expected analytical tail (beyond eruption/deposition)
-    maxTailLength = mean(uncert) * NormQuantile(1-1/(length(ages) + 1));
+    maxTailLength = mean(uncert) * norm_quantile(1-1/(length(ages) + 1));
     included = (ages-minimum(ages)) .>= maxTailLength;
 
     # Bootstrapped crystallization distribution, excluding maximum analytical tail
@@ -35,7 +35,7 @@
 ## --- Run MCMC
 
     # Run MCMC to estimate saturation and eruption/deposition age distributions
-    # (tminDist,~,~,~) = crystMinMaxMetropolis(nsteps,dist,ages,uncert);
+    # (tminDist,~,~,~) = metropolis_minmax_cryst(nsteps,dist,ages,uncert);
     tminDist = Array{Float64,1}(nsteps);
     @time crystMinMetropolis(nsteps,dist,ages,uncert,tminDist);
 
@@ -47,7 +47,7 @@
 
     h = plot(linspace(0,1,length(UniformDistribution)),UniformDistribution./mean(UniformDistribution),label="Uniform")
     plot!(linspace(0,1,length(MeltsVolcanicZirconDistribution)),MeltsVolcanicZirconDistribution./mean(MeltsVolcanicZirconDistribution),label="MELTS Volcanic")
-    plot!(linspace(0,1,length(TruncatedNormalDistribution)),TruncatedNormalDistribution./mean(TruncatedNormalDistribution),label="Truncated Normal")
+    plot!(linspace(0,1,length(TruncatedNormalDi;tribution)),TruncatedNormalDistribution./mean(TruncatedNormalDistribution),label="Truncated Normal")
     plot!(legend=:bottomleft,fg_color_legend=:white,xlabel="Time (unitless)",ylabel="Probability Density")
     savefig(h,"DistributionComparison.pdf")
 ## ---
