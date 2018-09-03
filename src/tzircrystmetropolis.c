@@ -145,7 +145,7 @@
 
  		// Decide to accept or reject the proposal
  		r = pcg32_random_r(&rng)/(double)UINT32_MAX;
- 		if (r < pow(10,theta_proposed-theta)){// && tmin_proposed < tmax_proposed){ // don't let tmax go below tmin
+ 		if (log10(r) < (theta_proposed-theta)){// && tmin_proposed < tmax_proposed){ // don't let tmax go below tmin
  			if (tmin_proposed != tmin){
  				tmin_step = fabs(tmin_proposed-tmin)*stepfactor;
  			}

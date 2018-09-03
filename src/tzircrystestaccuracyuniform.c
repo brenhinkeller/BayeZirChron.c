@@ -166,7 +166,7 @@ int findMetropolisEstimate(pcg32_random_t* rng, const double* dist, const uint32
 
 		// Decide to accept or reject the proposal
 		r = pcg32_random_r(rng)/(double)UINT32_MAX;
-		if (r < pow(10,theta_proposed-theta)){
+		if (log10(r) < (theta_proposed-theta)){
 			if (tmin_proposed != tmin){
 				tmin_step = fabs(tmin_proposed-tmin)*2.9;
 			}
