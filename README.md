@@ -1,6 +1,6 @@
 # BayeZirChron.c
 
-C version of Bayesian zircon eruption age estimation code
+C version of the Bayesian zircon eruption age estimation code from [Keller, Schoene, and Samperton (2018)](https://doi.org/10.7185/geochemlet.1826)
 
 ## Installation from command line
 
