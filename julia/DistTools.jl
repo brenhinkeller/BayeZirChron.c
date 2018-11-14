@@ -4,24 +4,23 @@
         return sqrt(2)*erfinv(2*F-1)
     end
 
-    # Bootstrap a KDE of the pre-eruptive (or pre-deposition) zircon distribution
-    # shape from a 2-d array of sample ages using a KDE of stacked sample data
-    function BootstrapCrystDistributionKDE(data::Array{Float64})
+    # Bootstrap a KDE of the pre-eruptive (or pre-deposition) mineral crystallization
+    # distribution shape from a 2-d array of sample ages using a KDE of stacked sample data
+    function BootstrapCrystDistributionKDE(data::Array{Float64}; cutoff::Number=-0.05)
         # Load all data points and scale from 0 to 1
-        allscaled = Array{Float64,1}();
+        allscaled = Array{Float64,1}([])
         for i=1:size(data,2)
-            scaled = data[:,i]-minimum(data[:,i]);
-            max = maximum(scaled);
-            if max > 0
-                scaled = scaled./max;
+            scaled = data[:,i] .- minimum(data[:,i])
+            if maximum(scaled) > 0
+                scaled = scaled ./ maximum(scaled)
             end
             allscaled = [allscaled; scaled]
         end
 
         # Calculate kernel density estimate, truncated at 0
-        kd = kde(allscaled,npoints=2^7);
-        t = kd.x .> -0.05;
-        return kd.density[t];
+        kd = kde(allscaled,npoints=2^7)
+        t = kd.x .> cutoff
+        return kd.density[t]
     end
 
     # Draw random numbers from a distribution specified by a vector of points
