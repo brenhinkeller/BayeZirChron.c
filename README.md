@@ -4,7 +4,7 @@ C version of the Bayesian zircon eruption age estimation code from [Keller, Scho
 
 ## Installation from command line
 
-Installation from the command line requires a working C compiler. The default [makefile](src/Makefile) assumes [gcc](https://gcc.gnu.org) (or an alias) is available. 
+Installation from the command line requires a working C compiler. The default [makefile](src/Makefile) assumes [gcc](https://gcc.gnu.org) (or an alias) is available.
 On linux/unix/bsd this is likely already true; on Mac OS the necessary tools for compiling C source can be installed by typing `xcode-select --install` at the command line.
 
 ```bash
@@ -23,7 +23,7 @@ To compile the parallel code used for synthetic distribution tests, additionally
 ```bash
 make parallel
 ```
-or 
+or
 
 ```bash
 mpicc -std=c11 -O3 -o tzircrystestaccuracy tzircrystestaccuracy.c
@@ -50,7 +50,7 @@ To reproduce the datafiles provided in this folder, compile the parallel code [t
 ```bash
 mpiexec -np <number-of-tasks> ./tzircrystestaccuracy  <sims-per-task> <nsteps> <dt/sigma>  Distribution.tsv  > results.tsv
 ```
-where <number-of-tasks> is the number of MPI tasks to run (typically you want this to be equal to the number of CPU cores or hardware threads you are running on),  <sims-per-task> is the number of simulations (at each N) to run per MPI task, <nsteps> is the length of Markov chain to run, <dt/sigma> is the crystallization timescale in units of sigma (analytical uncertainty), pulling synthetic data from a distribution specified in an ascii file `Distribution.tsv	
+where <number-of-tasks> is the number of MPI tasks to run (typically you want this to be equal to the number of CPU cores or hardware threads you are running on),  <sims-per-task> is the number of simulations (at each N) to run per MPI task, <nsteps> is the length of Markov chain to run, <dt/sigma> is the crystallization timescale in units of sigma (analytical uncertainty), pulling synthetic data from a distribution specified in an ascii file `Distribution.tsv
 for example:
 ```bash
 mpiexec -np 16 ./tzircrystestaccuracy 4 10000 1 MeltsTZircDistribution.tsv > eruptionestimates1.tsv
@@ -69,9 +69,8 @@ runs 4 simulations per task on 20 nodes with 16 cores each, for a total of 1280 
 
 ## Julia version
 
-[![Binder](https://mybinder.org/badge.svg)](https://mybinder.org/v2/gh/brenhinkeller/BayeZirChron.c/master?filepath=julia%2Fdemo.ipynb)
+[![Binder](https://mybinder.org/static/images/badge_logo.svg)](https://mybinder.org/v2/gh/brenhinkeller/BayeZirChron.c/master?filepath=julia%2Fdemo.ipynb)
 
 See [julia](julia/) folder. Try it out in this [interactive Jupyter notebook](https://mybinder.org/v2/gh/brenhinkeller/BayeZirChron.c/master?filepath=julia%2Fdemo.ipynb) via [Binder](https://mybinder.org)!
 
-See also [Chron.jl](https://github.com/brenhinkeller/Chron.jl)
-
+For future work, see [Chron.jl](https://github.com/brenhinkeller/Chron.jl), which can be run in [standalone eruption/deposition mode](https://github.com/brenhinkeller/Chron.jl#standalone-age-depth-modelling) using the approach developed here.
