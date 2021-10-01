@@ -8,7 +8,7 @@
     # distribution shape from a 2-d array of sample ages using a KDE of stacked sample data
     function BootstrapCrystDistributionKDE(data::Array{Float64}; cutoff::Number=-0.05)
         # Load all data points and scale from 0 to 1
-        allscaled = Array{Float64,1}([])
+        allscaled = Float64[]
         for i=1:size(data,2)
             scaled = data[:,i] .- minimum(data[:,i])
             if maximum(scaled) > 0
@@ -27,9 +27,9 @@
     # defining the PDF curve
     function draw_from_distribution(dist::Array{Float64}, n::Int)
         # Draw n random numbers from the distribution 'dist'
-        x = Array{Float64}(n);
-        dist_ymax = maximum(dist);
-        dist_xmax = length(dist)-1.0;
+        x = zeros(n)
+        dist_ymax = maximum(dist)
+        dist_xmax = length(dist) - 1.0
 
         for i=1:n;
             while true
@@ -51,25 +51,25 @@
 
     # Calculate a weigted mean, including MSWD, but without MSWD correction to uncertainty
     function awmean(x, sigma)
-        n = length(x);
-        s1 = 0.0; s2 = 0.0; s3 = 0.0;
+        n = length(x)
+        s1, s2, s3 = 0.0, 0.0, 0.0
 
         if n==1
-            wx = x[1];
-            mswd = 0;
-            wsigma = sigma[1];
+            wx = x[1]
+            mswd = 0
+            wsigma = sigma[1]
         else
             for i=1:n
-                s1 += x[i] / (sigma[i]*sigma[i]);
-                s2 += 1 / (sigma[i]*sigma[i]);
+                s1 += x[i] / (sigma[i]*sigma[i])
+                s2 += 1 / (sigma[i]*sigma[i])
             end
-            wx = s1/s2;
+            wx = s1/s2
 
             for i=1:n
-                s3 += (x[i] - wx) * (x[i] - wx) / (sigma[i]*sigma[i]);
+                s3 += (x[i] - wx) * (x[i] - wx) / (sigma[i]*sigma[i])
             end
-            mswd = s3 / (n-1);
-            wsigma = sqrt(1.0/s2);
+            mswd = s3 / (n-1)
+            wsigma = sqrt(1.0/s2)
         end
         return wx, wsigma, mswd
     end
@@ -77,43 +77,43 @@
     # Return the log-likelihood of a proposed crystallization distribution, with adjustments to prevent runaway at low N
     function check_cryst_LL(dist::Array{Float64}, data::Array{Float64}, uncert::Array{Float64}, tmin::Float64, tmax::Float64)
         # Define some frequently used variables
-        loglikelihood = 0.0;
-        datarows = length(data);
-        distrows = length(dist);
-        dist_xscale = distrows-1.00000000001;
-        dist_yave = mean(dist);
-        dt = abs(tmax-tmin);
+        loglikelihood = 0.0
+        datarows = length(data)
+        distrows = length(dist)
+        dist_xscale = distrows-1.00000000001
+        dist_yave = mean(dist)
+        dt = abs(tmax-tmin)
         # Cycle through each datum in data array
         for j=1:datarows
             # If possible, prevent aliasing problems by interpolation
             if (uncert[j] < dt/dist_xscale) && data[j] > tmin && data[j] < tmax
                 # Find (double) index
-                ix = (data[j] - tmin) / dt * dist_xscale + 1;
+                ix = (data[j] - tmin) / dt * dist_xscale + 1
                 # Interpolate corresponding distribution value
                 f = floor(Int,ix)
-                likelihood = (dist[f+1]*(ix-f) + dist[f]*(1-(ix-f))) / (dt * dist_yave);
+                likelihood = (dist[f+1]*(ix-f) + dist[f]*(1-(ix-f))) / (dt * dist_yave)
                 # Otherwise, sum contributions from Gaussians at each point in distribution
             else
-                likelihood = 0;
+                likelihood = 0
                 for i=1:distrows
-                    distx = tmin + dt*(i-1)/dist_xscale; # time-position of distribution point
+                    distx = tmin + dt*(i-1)/dist_xscale # time-position of distribution point
                     # Likelihood curve follows a Gaussian PDF. Note: dt cancels
                     likelihood += dist[i] / (dist_yave * distrows * uncert[j] * sqrt(2*pi)) *
-                    exp( - (distx-data[j])*(distx-data[j]) / (2*uncert[j]*uncert[j]) );
+                    exp( - (distx-data[j])*(distx-data[j]) / (2*uncert[j]*uncert[j]) )
                 end
             end
             loglikelihood += log(likelihood);
         end
         # Calculate a weighted mean and examine our MSWD
-        wm, wsigma, mswd = awmean(data, uncert);
+        wm, wsigma, mswd = awmean(data, uncert)
         if datarows == 1 || mswd < 1
-            Zf = 1;
+            Zf = 1
         elseif mswd*sqrt(datarows) > 1000
-            Zf = 0;
+            Zf = 0
         else
-            f = datarows-1.0;
+            f = datarows-1.0
             # Height of MSWD distribution relative to height at MSWD = 1 (see Wendt and Carl, 1991, Chemical geology)
-            Zf = exp((f/2-1)*log(mswd) - f/2*(mswd-1));
+            Zf = exp((f/2-1)*log(mswd) - f/2*(mswd-1))
         end
         # To prevent instability / runaway of the MCMC for small datasets (low N),
         # favor the weighted mean interpretation at high Zf (MSWD close to 1) and
@@ -193,9 +193,9 @@
 ## --- Function for parallel workers to evaluate
 
     function BootstrapEachN(DistributionToDrawFrom,Ns,nsteps,burnin,dt_sigma)
-        tminDist = Array{Float64,1}(nsteps);
-        AgeEst = Array{Float64}(length(Ns));
-        AgeEst_sigma = Array{Float64}(length(Ns));
+        tminDist = zeros(nsteps);
+        AgeEst = zeros(length(Ns))
+        AgeEst_sigma = zeros(length(Ns))
         for j=1:length(Ns)
             N = Ns[j]
             # Draw new set of ages where true minimum == 0 and analytical sigma == 1
